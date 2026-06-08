@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#050505" />
+    <meta name="description" content="Taller Solis Cotizador para generar cotizaciones mecanicas profesionales." />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Taller Solis Cotizador</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="screen active" id="screen-login">
+        <div class="brand">
+          <span>A TUS ORDENES</span>
+          <strong>TALLER SOLIS</strong>
+          <b>COTIZADOR</b>
+        </div>
+        <article class="panel">
+          <h1>Inicio de sesion</h1>
+          <p>Acceso rapido para crear cotizaciones del taller.</p>
+          <label>Usuario<input id="login-user" value="solis" /></label>
+          <label>Contrasena<input id="login-password" type="password" placeholder="cotizador" /></label>
+          <button class="primary full" id="login-button">ENTRAR</button>
+          <button class="ghost full" id="finger-button">ENTRAR CON HUELLA</button>
+          <small id="login-message">Usuario: solis | Contrasena: cotizador</small>
+        </article>
+      </section>
+
+      <section class="screen" id="screen-home">
+        <header class="header">
+          <div class="brand compact">
+            <span>A TUS ORDENES</span>
+            <strong>TALLER SOLIS</strong>
+            <b>COTIZADOR</b>
+          </div>
+        </header>
+        <h1>Dicta, revisa, cotiza y envia en segundos.</h1>
+        <div class="actions">
+          <button class="primary full" data-go="quote">CREAR COTIZACION POR VOZ</button>
+          <button class="ghost full" data-manual="true">NUEVA COTIZACION MANUAL</button>
+          <button class="ghost" data-go="history">HISTORIAL</button>
+          <button class="ghost" data-go="clients">CLIENTES</button>
+        </div>
+        <section class="metrics">
+          <article><strong id="metric-count">0</strong><span>Cotizaciones</span></article>
+          <article><strong id="metric-total">$0.00</strong><span>Total cotizado</span></article>
+          <article><strong id="metric-accepted">0</strong><span>Aceptadas</span></article>
+          <article><strong id="metric-pending">0</strong><span>Pendientes</span></article>
+        </section>
+        <article class="panel">
+          <h2>Asi de facil funciona</h2>
+          <ol>
+            <li>Dictas la informacion del cliente y del vehiculo.</li>
+            <li>La app acomoda los datos y sugiere redaccion tecnica.</li>
+            <li>Revisas importes, IVA, total y observaciones.</li>
+            <li>Guardas la cotizacion y la compartes por WhatsApp.</li>
+          </ol>
+        </article>
+      </section>
+
+      <section class="screen" id="screen-quote">
+        <header class="page-title">
+          <button class="back" data-go="home">VOLVER</button>
+          <h1>Cotizacion</h1>
+        </header>
+        <article class="mic-card">
+          <div class="mic" id="mic-status">MIC</div>
+          <h2 id="listen-label">Dictado por voz</h2>
+          <label>Texto dictado<textarea id="dictation" rows="5"></textarea></label>
+          <div class="actions">
+            <button class="primary" id="listen-button">GRABAR</button>
+            <button class="ghost" id="parse-button">ORDENAR CON IA</button>
+          </div>
+        </article>
+        <article class="panel form-grid">
+          <h2>Revision editable</h2>
+          <label>Cliente<input id="client-name" /></label>
+          <label>Telefono<input id="client-phone" /></label>
+          <label>Vehiculo<input id="vehicle" /></label>
+          <label>Marca<input id="brand" /></label>
+          <label>Modelo<input id="model" /></label>
+          <label>Ano<input id="year" inputmode="numeric" /></label>
+          <label>Placas<input id="plates" /></label>
+          <label class="wide">Diagnostico simple<textarea id="diagnosis" rows="3"></textarea></label>
+          <label>Trabajo a realizar<input id="work" /></label>
+          <label>Refacciones<input id="parts" /></label>
+          <button class="ghost wide" id="technical-button">REGENERAR REDACCION TECNICA</button>
+          <label class="wide">Redaccion tecnica sugerida<textarea id="technical" rows="5"></textarea></label>
+          <label class="wide">Observaciones<textarea id="observations" rows="3"></textarea></label>
+        </article>
+        <article class="panel">
+          <div class="row-between">
+            <h2>Conceptos</h2>
+            <button class="ghost" id="add-concept">AGREGAR</button>
+          </div>
+          <div id="concept-list"></div>
+        </article>
+        <article class="quote-paper" id="paper-preview"></article>
+        <article class="panel">
+          <div class="row-between"><span>Subtotal</span><strong id="subtotal">$0.00</strong></div>
+          <div class="row-between"><span>IVA 16%</span><strong id="iva">$0.00</strong></div>
+          <div class="row-between total"><span>TOTAL</span><strong id="total">$0.00</strong></div>
+          <button class="ghost full" id="draft-button">GUARDAR BORRADOR</button>
+          <button class="primary full" id="save-button">GENERAR COTIZACION</button>
+        </article>
+      </section>
+
+      <section class="screen" id="screen-history">
+        <header class="page-title">
+          <button class="back" data-go="home">VOLVER</button>
+          <h1>Historial</h1>
+        </header>
+        <label>Buscar<input id="search" placeholder="Cliente, folio, vehiculo o estatus" /></label>
+        <div id="history-list"></div>
+      </section>
+
+      <section class="screen" id="screen-clients">
+        <header class="page-title">
+          <button class="back" data-go="home">VOLVER</button>
+          <h1>Clientes</h1>
+        </header>
+        <article class="panel">
+          <h2>Nuevo cliente</h2>
+          <label>Nombre<input id="new-client" /></label>
+          <label>Telefono<input id="new-phone" /></label>
+          <label>Vehiculo<input id="new-vehicle" /></label>
+          <button class="primary full" id="client-button">GUARDAR CLIENTE</button>
+        </article>
+        <div id="client-list"></div>
+      </section>
+
+      <nav class="tabbar">
+        <button data-go="home">INICIO</button>
+        <button data-go="quote">VOZ</button>
+        <button data-go="history">HISTORIAL</button>
+        <button data-go="clients">CLIENTES</button>
+      </nav>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

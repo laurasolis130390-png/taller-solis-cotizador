@@ -1,0 +1,20 @@
+FORMA FACIL DE ABRIR LA APP
+
+1. Abre la carpeta:
+   C:\Users\ylikamateriales\OneDrive\Documents\FINANZAS LABESA\web-pwa
+
+2. Da doble clic en:
+   index.html
+
+3. Se abre en tu navegador.
+
+4. Entra con:
+   Usuario: solis
+   Contrasena: cotizador
+
+Esta version no usa Expo Go, no necesita QR y no necesita npm start.
+
+Para usarla en el celular:
+1. Abre el archivo en Chrome o Edge desde la computadora.
+2. Tambien puedes copiar la carpeta web-pwa al celular y abrir index.html.
+3. En Chrome puedes usar "Agregar a pantalla principal" para tenerla como app.
