@@ -13,6 +13,7 @@
     <main class="app-shell">
       <section class="screen active" id="screen-login">
         <div class="brand">
+          <img class="brand-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
           <span>A TUS ORDENES</span>
           <strong>TALLER SOLIS</strong>
           <b>COTIZADOR</b>
@@ -20,17 +21,19 @@
         <article class="panel">
           <h1>Inicio de sesion</h1>
           <p>Acceso rapido para crear cotizaciones del taller.</p>
-          <label>Usuario<input id="login-user" value="solis" /></label>
+          <label>Usuario o correo<input id="login-user" value="solis" /></label>
           <label>Contrasena<input id="login-password" type="password" placeholder="cotizador" /></label>
           <button class="primary full" id="login-button">ENTRAR</button>
           <button class="ghost full" id="finger-button">ENTRAR CON HUELLA</button>
           <small id="login-message">Usuario: solis | Contrasena: cotizador</small>
+          <small id="finger-hint">Para activar huella, escribe usuario y contrasena una vez y toca ENTRAR CON HUELLA.</small>
         </article>
       </section>
 
       <section class="screen" id="screen-home">
         <header class="header">
           <div class="brand compact">
+            <img class="brand-logo compact-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
             <span>A TUS ORDENES</span>
             <strong>TALLER SOLIS</strong>
             <b>COTIZADOR</b>
@@ -138,6 +141,6 @@
         <button data-go="clients">CLIENTES</button>
       </nav>
     </main>
-    <script src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

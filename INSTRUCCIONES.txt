@@ -14,7 +14,73 @@ FORMA FACIL DE ABRIR LA APP
 
 Esta version no usa Expo Go, no necesita QR y no necesita npm start.
 
+LOGO
+
+Guarda la imagen real del logo como:
+   logo-solis.png
+
+Debe quedar dentro de:
+   C:\Users\ylikamateriales\OneDrive\Documents\FINANZAS LABESA\web-pwa
+
+Luego sube tambien ese archivo a GitHub junto con index.html, app.js y styles.css.
+
+HUELLA / BIOMETRIA
+
+La huella funciona en celular cuando la app esta publicada en HTTPS, por ejemplo en GitHub Pages.
+No funciona desde archivo local ni desde algunos navegadores internos como WhatsApp/Facebook. Abre el link en Chrome y despues instala la app en pantalla principal.
+
+Primer uso:
+1. Escribe usuario y contrasena.
+2. Toca ACTIVAR HUELLA si aparece.
+3. El celular pedira huella, rostro o PIN para crear la passkey.
+4. Despues ya podras entrar con ENTRAR CON HUELLA en ese mismo celular.
+
+Si abres el archivo directo desde la computadora, la huella puede no funcionar. Debe abrirse desde el link publicado de GitHub Pages.
+
 Para usarla en el celular:
 1. Abre el archivo en Chrome o Edge desde la computadora.
 2. Tambien puedes copiar la carpeta web-pwa al celular y abrir index.html.
 3. En Chrome puedes usar "Agregar a pantalla principal" para tenerla como app.
+
+SUPABASE / RESPALDO EN LA NUBE
+
+1. Crea un proyecto en https://supabase.com
+
+2. En Supabase abre:
+   SQL Editor
+
+3. Copia y ejecuta el contenido de:
+   supabase-setup.sql
+
+4. Crea el usuario:
+   Authentication > Users > Add user
+
+   Email:
+   solis@tallersolis.local
+
+   Password:
+   cotizador
+
+   Marca el correo como confirmado si Supabase lo muestra.
+
+5. Copia tus claves:
+   Project Settings > API
+
+   Project URL
+   anon public key
+
+6. Pegalas en:
+   supabase-config.js
+
+   SUPABASE_URL = "TU_PROJECT_URL"
+   SUPABASE_ANON_KEY = "TU_ANON_PUBLIC_KEY"
+
+7. Sube de nuevo los archivos a GitHub.
+
+8. En la app entra con:
+   Usuario: solis
+   Contrasena: cotizador
+
+Tambien puedes entrar con:
+   Usuario: solis@tallersolis.local
+   Contrasena: cotizador

@@ -1,11 +1,20 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+import { LOCAL_DEMO_PASSWORD, LOCAL_DEMO_USER, SUPABASE_ANON_KEY, SUPABASE_URL } from "./supabase-config.js";
+
 const STORAGE_KEY = "taller-solis-web";
+const BIOMETRIC_KEY = "taller-solis-biometric";
 const TAX = 0.16;
+const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const supabase = SUPABASE_READY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const sampleDictation =
   "Cliente Juan Perez, camioneta Nissan NP300 2016, cambio de clutch completo, plato, disco y balero, mano de obra seis mil pesos mas IVA, diagnostico: la camioneta no avanza por falla total del clutch";
 
 let state = loadState();
 let draft = parseVoice(sampleDictation);
 let listening = false;
+let currentUser = null;
+let biometricEnabled = false;
+let biometricAvailable = false;
 
 function starterState() {
   const quote = {
@@ -31,6 +40,140 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function biometricSupported() {
+  return Boolean(window.PublicKeyCredential && navigator.credentials);
+}
+
+async function checkBiometricAvailability() {
+  if (!biometricSupported()) return false;
+  if (!PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) return true;
+  try {
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
+  }
+}
+
+function bufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let text = "";
+  bytes.forEach((byte) => {
+    text += String.fromCharCode(byte);
+  });
+  return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBuffer(value) {
+  const padded = `${value}${"=".repeat((4 - (value.length % 4)) % 4)}`;
+  const text = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = new Uint8Array(text.length);
+  for (let index = 0; index < text.length; index += 1) bytes[index] = text.charCodeAt(index);
+  return bytes.buffer;
+}
+
+function randomChallenge() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytes;
+}
+
+async function registerBiometric(userName) {
+  if (!biometricSupported()) {
+    throw new Error("Este celular o navegador no permite huella/passkey.");
+  }
+
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge: randomChallenge(),
+      rp: { name: "Taller Solis Cotizador" },
+      user: {
+        id: new TextEncoder().encode(userName || "solis"),
+        name: userName || "solis",
+        displayName: "Taller Solis"
+      },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: {
+        authenticatorAttachment: "platform",
+        userVerification: "required",
+        residentKey: "preferred"
+      },
+      timeout: 60000,
+      attestation: "none"
+    }
+  });
+
+  localStorage.setItem(BIOMETRIC_KEY, JSON.stringify({ id: bufferToBase64Url(credential.rawId), userName }));
+  biometricEnabled = true;
+}
+
+async function unlockWithBiometric() {
+  if (!biometricSupported()) {
+    throw new Error("Este celular o navegador no permite huella/passkey.");
+  }
+
+  const saved = JSON.parse(localStorage.getItem(BIOMETRIC_KEY) || "null");
+  if (!saved?.id) {
+    throw new Error("Primero activa la huella con usuario y contrasena.");
+  }
+
+  await navigator.credentials.get({
+    publicKey: {
+      challenge: randomChallenge(),
+      allowCredentials: [{ id: base64UrlToBuffer(saved.id), type: "public-key" }],
+      userVerification: "required",
+      timeout: 60000
+    }
+  });
+
+  if (SUPABASE_READY) {
+    const { data } = await supabase.auth.getSession();
+    currentUser = data.session?.user || null;
+    if (currentUser) await loadCloudState();
+  }
+
+  return true;
+}
+
+async function signIn(user, password) {
+  if (!SUPABASE_READY) {
+    return user === LOCAL_DEMO_USER && password === LOCAL_DEMO_PASSWORD;
+  }
+
+  const email = user.includes("@") ? user : `${user}@tallersolis.local`;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.user) {
+    return false;
+  }
+
+  currentUser = data.user;
+  await loadCloudState();
+  return true;
+}
+
+async function loadCloudState() {
+  if (!SUPABASE_READY || !currentUser) return;
+  const { data, error } = await supabase.from("app_data").select("payload").eq("user_id", currentUser.id).maybeSingle();
+  if (error) {
+    console.warn("No se pudo leer Supabase", error.message);
+    return;
+  }
+  if (data?.payload?.quotes && data?.payload?.clients) {
+    state = data.payload;
+    saveState();
+  } else {
+    await syncCloudState();
+  }
+}
+
+async function syncCloudState() {
+  saveState();
+  if (!SUPABASE_READY || !currentUser) return;
+  const { error } = await supabase
+    .from("app_data")
+    .upsert({ user_id: currentUser.id, payload: state, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) console.warn("No se pudo sincronizar Supabase", error.message);
 }
 
 function money(value) {
@@ -102,6 +245,11 @@ function go(screen) {
   document.querySelectorAll(".tabbar button").forEach((button) => button.classList.toggle("active", button.dataset.go === screen));
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function persistAndRender() {
+  syncCloudState();
+  render();
 }
 
 function bindDraft() {
@@ -232,7 +380,7 @@ function saveQuote(status) {
   } else {
     state.clients.unshift({ id: `cl-${Date.now()}`, name: quote.clientName || "Cliente sin nombre", phone: quote.clientPhone, vehicles: [quote.vehicle].filter(Boolean) });
   }
-  saveState();
+  syncCloudState();
   alert(`Cotizacion ${quote.folio} guardada.`);
   go("history");
 }
@@ -250,19 +398,74 @@ function escapeHtml(value) {
 
 function setup() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => go(button.dataset.go)));
+  biometricEnabled = Boolean(localStorage.getItem(BIOMETRIC_KEY));
+  checkBiometricAvailability().then((available) => {
+    biometricAvailable = available;
+    const fingerButton = document.getElementById("finger-button");
+    if (!available) {
+      fingerButton.textContent = "HUELLA NO DISPONIBLE";
+      fingerButton.disabled = true;
+      document.getElementById("finger-hint").textContent = "Este navegador no permite huella. Abre la app desde Chrome y el icono instalado.";
+      return;
+    }
+    fingerButton.textContent = biometricEnabled ? "ENTRAR CON HUELLA" : "ACTIVAR HUELLA";
+    document.getElementById("finger-hint").textContent = biometricEnabled
+      ? "Huella activada en este celular."
+      : "Primero escribe usuario y contrasena. Luego toca ACTIVAR HUELLA.";
+  });
   document.querySelector("[data-manual]").addEventListener("click", () => {
     draft = parseVoice("");
     document.getElementById("dictation").value = "";
     go("quote");
   });
-  document.getElementById("login-button").addEventListener("click", () => {
+  document.getElementById("login-button").addEventListener("click", async () => {
     const user = document.getElementById("login-user").value.trim().toLowerCase();
     const pass = document.getElementById("login-password").value;
-    if (user === "solis" && pass === "cotizador") go("home");
-    else document.getElementById("login-message").textContent = "Usuario o contrasena incorrectos.";
+    document.getElementById("login-message").textContent = "Validando acceso...";
+    if (await signIn(user, pass)) {
+      document.getElementById("login-message").textContent = SUPABASE_READY ? "Datos conectados a Supabase." : "Modo local activo.";
+      if (biometricAvailable && !localStorage.getItem(BIOMETRIC_KEY) && confirm("Quieres activar huella en este celular?")) {
+        try {
+          await registerBiometric(user);
+          document.getElementById("finger-button").textContent = "ENTRAR CON HUELLA";
+          document.getElementById("finger-hint").textContent = "Huella activada en este celular.";
+        } catch (error) {
+          document.getElementById("login-message").textContent = "Entraste con contrasena. La huella no se pudo activar en este navegador.";
+        }
+      }
+      go("home");
+    } else {
+      document.getElementById("login-message").textContent = "Usuario o contrasena incorrectos.";
+    }
   });
-  document.getElementById("finger-button").addEventListener("click", () => {
-    document.getElementById("login-message").textContent = "En navegador se simula la huella. Usa el boton ENTRAR.";
+  document.getElementById("finger-button").addEventListener("click", async () => {
+    const user = document.getElementById("login-user").value.trim().toLowerCase();
+    const pass = document.getElementById("login-password").value;
+    try {
+      if (!biometricAvailable) {
+        document.getElementById("login-message").textContent = "Huella no disponible aqui. Abre desde Chrome o usa contrasena.";
+        return;
+      }
+      document.getElementById("login-message").textContent = "Abriendo huella del celular...";
+      if (localStorage.getItem(BIOMETRIC_KEY)) {
+        await unlockWithBiometric();
+        document.getElementById("login-message").textContent = "Acceso con huella correcto.";
+        go("home");
+        return;
+      }
+
+      if (!(await signIn(user, pass))) {
+        document.getElementById("login-message").textContent = "Primero escribe usuario y contrasena correctos para activar huella.";
+        return;
+      }
+
+      await registerBiometric(user);
+      document.getElementById("finger-hint").textContent = "Huella activada en este celular.";
+      document.getElementById("login-message").textContent = "Huella activada. Entrando...";
+      go("home");
+    } catch (error) {
+      document.getElementById("login-message").textContent = error.message || "No se pudo usar la huella.";
+    }
   });
   document.getElementById("dictation").value = sampleDictation;
   document.getElementById("parse-button").addEventListener("click", () => {
@@ -314,8 +517,7 @@ function setup() {
     }
     if (event.target.dataset.whatsapp) shareWhatsApp(id);
     if (event.target.dataset.delete) state.quotes = state.quotes.map((quote) => (quote.id === id ? { ...quote, deletedAt: quote.deletedAt ? undefined : new Date().toISOString() } : quote));
-    saveState();
-    render();
+    persistAndRender();
   });
   document.getElementById("client-button").addEventListener("click", () => {
     const name = document.getElementById("new-client").value.trim();
@@ -326,7 +528,7 @@ function setup() {
       phone: document.getElementById("new-phone").value,
       vehicles: [document.getElementById("new-vehicle").value].filter(Boolean)
     });
-    saveState();
+    syncCloudState();
     document.getElementById("new-client").value = "";
     document.getElementById("new-phone").value = "";
     document.getElementById("new-vehicle").value = "";

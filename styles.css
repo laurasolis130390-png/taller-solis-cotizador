@@ -87,6 +87,19 @@ li {
   margin-bottom: 18px;
 }
 
+.brand-logo {
+  display: block;
+  width: min(100%, 430px);
+  max-height: 230px;
+  object-fit: contain;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 0 18px rgba(255, 196, 0, 0.45));
+}
+
+.brand-logo.missing {
+  display: none;
+}
+
 .brand span,
 .brand b,
 .brand strong {
@@ -110,13 +123,30 @@ li {
 }
 
 .brand.compact {
-  display: inline-block;
+  display: inline-grid;
+  grid-template-columns: 74px 1fr;
+  align-items: center;
+  column-gap: 10px;
   padding: 8px 12px;
   text-align: left;
 }
 
 .brand.compact strong {
   font-size: 18px;
+}
+
+.brand.compact span,
+.brand.compact strong,
+.brand.compact b {
+  grid-column: 2;
+}
+
+.compact-logo {
+  grid-row: 1 / 4;
+  grid-column: 1;
+  width: 74px;
+  max-height: 58px;
+  margin: 0;
 }
 
 .header,
@@ -294,6 +324,15 @@ button {
   border-bottom: 2px solid #111;
   padding-bottom: 10px;
   margin-bottom: 10px;
+}
+
+.paper-head::before {
+  content: "";
+  width: 92px;
+  min-width: 92px;
+  height: 58px;
+  display: block;
+  background: url("./logo-solis.png?v=2") center / contain no-repeat;
 }
 
 .paper-logo {
