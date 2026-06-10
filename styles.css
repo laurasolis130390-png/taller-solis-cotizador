@@ -135,6 +135,8 @@ li {
   background: linear-gradient(135deg, rgba(255, 196, 0, 0.18), rgba(17, 19, 24, 0.98));
   color: var(--gold);
   box-shadow: 0 0 18px rgba(255, 196, 0, 0.16);
+  min-height: 54px;
+  font-size: 15px;
 }
 
 .sound-toggle.active {
@@ -286,6 +288,10 @@ button {
   font-size: 19px;
   font-weight: 950;
   margin-bottom: 5px;
+}
+
+.login-assistant {
+  margin-top: -4px;
 }
 
 .voice-intro {

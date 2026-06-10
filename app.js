@@ -109,10 +109,10 @@ function startBackgroundMusic() {
   const loop = () => {
     if (!audioContext || !soundEnabled) return;
     const now = audioContext.currentTime + 0.05;
-    playTone(164.81, now, 1.8, 0.026, "triangle");
-    playTone(246.94, now + 0.45, 1.4, 0.018, "sine");
-    playTone(329.63, now + 1.15, 1.1, 0.014, "sine");
-    playTone(61.74, now + 0.02, 0.18, 0.022, "sawtooth");
+    playTone(164.81, now, 1.8, 0.045, "triangle");
+    playTone(246.94, now + 0.45, 1.4, 0.03, "sine");
+    playTone(329.63, now + 1.15, 1.1, 0.024, "sine");
+    playTone(61.74, now + 0.02, 0.18, 0.035, "sawtooth");
     musicTimer = window.setTimeout(loop, 2600);
   };
   loop();
@@ -150,7 +150,7 @@ function updateSoundButton() {
   const button = document.getElementById("sound-button");
   if (!button) return;
   button.classList.toggle("active", soundEnabled);
-  button.textContent = soundEnabled ? "VOZ Y MUSICA ACTIVAS" : "ACTIVAR VOZ Y MUSICA";
+  button.textContent = soundEnabled ? "VOZ Y MUSICA ACTIVAS" : "TOCA AQUI: ACTIVAR VOZ Y MUSICA";
 }
 
 async function toggleSound() {
@@ -159,6 +159,10 @@ async function toggleSound() {
   if (soundEnabled) {
     startBackgroundMusic();
     if (audioContext?.state === "suspended") await audioContext.resume();
+    const now = audioContext?.currentTime || 0;
+    playTone(392, now + 0.02, 0.18, 0.06, "sine");
+    playTone(523.25, now + 0.2, 0.22, 0.055, "sine");
+    playTone(659.25, now + 0.42, 0.28, 0.05, "triangle");
     playWelcome(true);
   } else {
     stopBackgroundMusic();
