@@ -1,4 +1,4 @@
-const CACHE_NAME = "taller-solis-cotizador-v19";
+const CACHE_NAME = "taller-solis-cotizador-v20";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,9 @@ const ASSETS = [
   "./icon.svg",
   "./icon-192.png",
   "./icon-512.png",
+  "./android-chrome-192x192.png",
+  "./android-chrome-512x512.png",
+  "./favicon-192.png",
   "./logo-solis.png"
 ];
 
