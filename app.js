@@ -145,15 +145,20 @@ function speak(text) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "es-MX";
-  utterance.rate = 0.94;
-  utterance.pitch = 0.92;
+  const voices = window.speechSynthesis.getVoices?.() || [];
+  utterance.voice =
+    voices.find((voice) => /es[-_](MX|US|ES)/i.test(voice.lang) && /female|mujer|google|paulina|sabina|helena/i.test(voice.name)) ||
+    voices.find((voice) => /es[-_]/i.test(voice.lang)) ||
+    null;
+  utterance.rate = 1;
+  utterance.pitch = 1.02;
   window.speechSynthesis.speak(utterance);
 }
 
 function playWelcome(force = false) {
   if (!force && welcomeSpoken) return;
   welcomeSpoken = true;
-  speak("Hola Leonardo. Bienvenido a Taller Solis Cotizador. Estoy lista para ayudarte a crear cotizaciones.");
+  speak("Hola Leonardo, bienvenido a Taller Solis Cotizador. Cuentame el caso del cliente con tus palabras, y yo acomodo la cotizacion.");
 }
 
 function updateSoundButton() {
@@ -283,20 +288,26 @@ async function syncCloudState() {
 }
 
 function normalizeAiDraft(data, originalText) {
-  const total = Number(data?.precio_total || data?.total || 0);
+  const aiTotal = Number(data?.precio_total || data?.total || 0);
+  const spokenTotal = moneyFromText(originalText);
+  const total = aiTotal >= 1900 && aiTotal <= 2099 && spokenTotal ? spokenTotal : aiTotal || spokenTotal;
   const subtotal = total > 0 ? Math.round((total / (1 + TAX)) * 100) / 100 : 0;
-  const conceptDescription = data?.concepto || data?.trabajo || "Servicio mecanico solicitado";
+  const fallback = parseVoice(originalText);
+  const clientName = cleanPersonName(data?.cliente) || fallback.clientName;
+  const vehicle = extractVehicle(data?.vehiculo || "") || fallback.vehicle;
+  const work = formatWork(data?.trabajo || data?.concepto || "") || fallback.work;
+  const conceptDescription = formatWork(data?.concepto || data?.trabajo || "") || work || "Servicio mecanico solicitado";
   return {
-    clientName: data?.cliente || "",
+    clientName,
     clientPhone: "",
-    vehicle: data?.vehiculo || "",
+    vehicle,
     brand: "",
     model: "",
     year: "",
     plates: data?.placas || "",
     diagnosis: data?.diagnostico || originalText,
     technical: data?.redaccion_tecnica || technicalText(data?.diagnostico || originalText),
-    work: data?.trabajo || conceptDescription,
+    work,
     parts: data?.refacciones || "",
     observations: data?.observaciones || "Vigencia de la cotizacion: 7 dias. Sujeto a revision fisica de la unidad.",
     concepts: [
@@ -336,6 +347,29 @@ function amountFrom(text) {
   return Number(String(text || "").replace(/[^0-9.]/g, "")) || 0;
 }
 
+function numericCandidates(text) {
+  return [...String(text || "").matchAll(/\$?\s*(\d{1,3}(?:[,\s]\d{3})+|\d+(?:\.\d+)?)\s*(?:pesos?|mxn)?/gi)]
+    .map((match) => ({
+      value: Number(match[1].replace(/[,\s]/g, "")) || 0,
+      raw: match[0],
+      index: match.index || 0
+    }))
+    .filter((item) => item.value > 0);
+}
+
+function looksLikeVehicleYear(value, text, index) {
+  const near = plain(String(text || "").slice(Math.max(0, index - 24), index + 24)).toLowerCase();
+  return value >= 1900 && value <= 2099 && /\b(ano|año|modelo|mod|aveo|nissan|ford|chevrolet|toyota|honda|mazda|jetta|versa|tsuru|np300)\b/.test(near);
+}
+
+function moneyFromText(text) {
+  const candidates = numericCandidates(text);
+  const withMoneyWords = candidates.find((item) => /\$|pesos?|mxn/i.test(item.raw) && !looksLikeVehicleYear(item.value, text, item.index));
+  if (withMoneyWords) return withMoneyWords.value;
+  const valid = candidates.find((item) => !looksLikeVehicleYear(item.value, text, item.index) && !(item.value >= 1900 && item.value <= 2099));
+  return valid?.value || 0;
+}
+
 function wordsToAmount(text) {
   const lower = plain(text).toLowerCase();
   const values = [
@@ -362,17 +396,20 @@ function wordsToAmount(text) {
 function findMoneyNear(text, words) {
   const clean = plain(text);
   const lower = clean.toLowerCase();
-  const keyword = words.find((word) => lower.includes(word));
-  if (!keyword) return 0;
-  const start = Math.max(lower.indexOf(keyword) - 45, 0);
-  const end = Math.min(lower.indexOf(keyword) + 120, clean.length);
-  const segment = clean.slice(start, end);
-  return amountFrom(segment.match(/\$?\s*\d[\d,.\s]*/)?.[0] || "") || wordsToAmount(segment);
+  for (const keyword of words) {
+    if (!lower.includes(keyword)) continue;
+    const start = lower.indexOf(keyword);
+    const end = Math.min(start + 140, clean.length);
+    const segment = clean.slice(start, end);
+    const amount = moneyFromText(segment) || wordsToAmount(segment);
+    if (amount) return amount;
+  }
+  return 0;
 }
 
 function cleanPersonName(value) {
   return String(value || "")
-    .replace(/\b(ahora|ahorita|tiene|trae|con|y|me|dice|le|su)\b.*$/i, "")
+    .replace(/\b(ahora|ahorita|tiene|trae|trajo|llevo|llego|vino|con|y|me|dice|le|su|coche|carro|vehiculo|camioneta)\b.*$/i, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -384,10 +421,28 @@ function titleCase(value) {
     .trim();
 }
 
+function formatWork(value) {
+  return titleCase(
+    String(value || "")
+      .replace(/\b(y le|le cuesta|cuesta|precio|total|sale en|queda en|por)\b.*$/i, "")
+      .replace(/\b\d+[\d,.\s]*(pesos?|mxn)?\b.*$/i, "")
+      .trim()
+      .replace(/\by$/i, "")
+      .trim()
+  )
+    .replace(/\bY$/g, "")
+    .replace(/^Cambiar\b/, "Cambio de")
+    .replace(/\bOrquilla\b/g, "Horquilla")
+    .replace(/\bDe\b/g, "de")
+    .replace(/\bDel\b/g, "del")
+    .replace(/\bLa\b/g, "la")
+    .replace(/\bEl\b/g, "el");
+}
+
 function extractClient(clean) {
   const patterns = [
-    /cliente\s+(?:que\s+)?(?:se\s+llama|llamado|nombre)?\s*([a-z\s]{3,45}?)(?=\s+(?:tiene|trae|con|vino|llego|me|dice|le|su)\b|[,.;]|$)/i,
-    /(?:se llama|a nombre de|nombre de)\s+([a-z\s]{3,45}?)(?=\s+(?:tiene|trae|con|vino|llego|me|dice|le|su)\b|[,.;]|$)/i
+    /(?:mi\s+)?cliente\s+(?:que\s+)?(?:se\s+llama|llamado|nombre)?\s*([a-z\s]{3,60}?)(?=\s+(?:tiene|trae|trajo|llevo|llego|vino|con|me|dice|le|su|coche|carro|vehiculo|camioneta)\b|[,.;]|$)/i,
+    /(?:se llama|a nombre de|nombre de)\s+([a-z\s]{3,60}?)(?=\s+(?:tiene|trae|trajo|llevo|llego|vino|con|me|dice|le|su|coche|carro|vehiculo|camioneta)\b|[,.;]|$)/i
   ];
   for (const pattern of patterns) {
     const match = clean.match(pattern);
@@ -402,13 +457,24 @@ function extractVehicle(clean) {
   const match =
     clean.match(new RegExp(`(?:tiene|trae|con|es|vehiculo|carro|coche|camioneta|unidad)\\s+(?:un|una)?\\s*(${brands}[^,.;]*)`, "i")) ||
     clean.match(new RegExp(`\\b(${brands}\\s+[a-z0-9\\s-]{0,30})`, "i"));
-  return titleCase((match?.[1] || "").replace(/\s+/g, " "));
+  const stopWords =
+    /\b(a revision|a revisi[oó]n|revision|revisi[oó]n|para|porque|y le|le detecte|le detect[eé]|detecte|detect[eé]|encontre|encontr[eé]|presenta|tiene ruido|ruido|sonido|hay que|cambiar|cambio|precio|total|cuesta|le cuesta|diagnostico|diagnóstico)\b.*$/i;
+  return titleCase(
+    (match?.[1] || "")
+      .replace(stopWords, "")
+      .replace(/\b(cambiar|cambio|hay que|precio|total|cuesta|le cuesta|tiene ruido|ruido|sonido|diagnostico|diagnóstico)\b.*$/i, "")
+      .replace(/\s+/g, " ")
+  );
 }
 
 function extractWork(clean) {
   const lower = clean.toLowerCase();
-  const direct = clean.match(/(?:hay que|ay que|se debe|necesita|ocupa|requiere|toca)\s+([^,.]+)/i)?.[1]?.trim();
-  if (direct) return titleCase(direct);
+  const repair = clean.match(/\b(cambio|cambiar|reparacion|reparar)\s+(?:de\s+)?([^,.]+)/i)?.[0]?.trim();
+  if (repair) return formatWork(repair);
+  const direct =
+    clean.match(/(?:hay que|ay que|se debe|necesita|ocupa|requiere|toca|trabajo|servicio)\s+([^,.]+)/i)?.[1]?.trim() ||
+    clean.match(/\b(revision|revisar)\s+(?:de\s+)?([^,.]+)/i)?.[0]?.trim();
+  if (direct) return formatWork(direct);
   if (lower.includes("horquilla") || lower.includes("orquilla")) return "Cambio de horquilla lado conductor";
   if (lower.includes("clutch") || lower.includes("embrague")) return "Cambio de clutch completo";
   if (lower.includes("freno") || lower.includes("balata")) return "Servicio de frenos";
@@ -448,13 +514,17 @@ function parseVoice(text) {
       : lower.includes("horquilla") || lower.includes("orquilla")
         ? "Horquilla lado conductor"
         : clean.match(/(?:incluye|lleva|ocupa|necesita)\s+([^,.]+)/i)?.[1]?.trim() || "";
-  const firstPrice = amountFrom(clean.match(/\$?\s*\d[\d,.\s]*/)?.[0] || "") || wordsToAmount(clean);
+  const firstPrice = moneyFromText(clean) || wordsToAmount(clean);
   const fallbackTotal = totalPrice || labor || partsPrice || firstPrice;
   const finalPriceAsSubtotal = totalPrice ? Math.round((totalPrice / (1 + TAX)) * 100) / 100 : 0;
+  const singleDetectedPrice = !totalPrice && !labor && !partsPrice && firstPrice;
+  const conceptDescription = work || "Servicio mecanico solicitado";
   const concepts = totalPrice
-    ? [{ id: `c-${Date.now()}-1`, description: parts ? `${work} (${parts})` : work, quantity: 1, price: finalPriceAsSubtotal }]
+    ? [{ id: `c-${Date.now()}-1`, description: conceptDescription, quantity: 1, price: finalPriceAsSubtotal }]
+    : singleDetectedPrice
+      ? [{ id: `c-${Date.now()}-1`, description: conceptDescription, quantity: 1, price: Math.round((firstPrice / (1 + TAX)) * 100) / 100 }]
     : [
-        { id: `c-${Date.now()}-1`, description: parts ? `${work} (${parts})` : work, quantity: 1, price: partsPrice || Math.max(fallbackTotal - (labor || 0), 0) },
+        { id: `c-${Date.now()}-1`, description: conceptDescription, quantity: 1, price: partsPrice || Math.max(fallbackTotal - (labor || 0), 0) },
         { id: `c-${Date.now()}-2`, description: "Mano de obra", quantity: 1, price: labor || (partsPrice ? 0 : fallbackTotal) }
       ].filter((item) => item.price > 0 || item.description !== "Mano de obra");
   return {
@@ -629,6 +699,7 @@ function renderHistory() {
           ${["Borrador", "Enviada", "Aceptada", "Rechazada", "Pagada"].map((status) => `<button data-status="${status}" data-id="${quote.id}">${status}</button>`).join("")}
         </div>
         <div class="actions">
+          <button class="ghost" data-edit="${quote.id}">EDITAR</button>
           <button class="ghost" data-duplicate="${quote.id}">DUPLICAR</button>
           <button class="ghost" data-pdf="${quote.id}">PDF</button>
           <button class="success" data-whatsapp="${quote.id}">WHATSAPP</button>
@@ -1013,8 +1084,22 @@ function setup() {
   });
   document.getElementById("search").addEventListener("input", renderHistory);
   document.getElementById("history-list").addEventListener("click", async (event) => {
-    const id = event.target.dataset.id || event.target.dataset.duplicate || event.target.dataset.pdf || event.target.dataset.whatsapp || event.target.dataset.delete;
+    const id =
+      event.target.dataset.id ||
+      event.target.dataset.edit ||
+      event.target.dataset.duplicate ||
+      event.target.dataset.pdf ||
+      event.target.dataset.whatsapp ||
+      event.target.dataset.delete;
     if (event.target.dataset.status) state.quotes = state.quotes.map((quote) => (quote.id === id ? { ...quote, status: event.target.dataset.status } : quote));
+    if (event.target.dataset.edit) {
+      const source = state.quotes.find((quote) => quote.id === id);
+      if (source) {
+        draft = structuredClone(source);
+        go("quote");
+        return;
+      }
+    }
     if (event.target.dataset.duplicate) {
       const source = state.quotes.find((quote) => quote.id === id);
       state.quotes.unshift({ ...structuredClone(source), id: `q-${Date.now()}`, folio: nextFolio(), status: "Borrador", date: new Date().toISOString(), deletedAt: undefined });
