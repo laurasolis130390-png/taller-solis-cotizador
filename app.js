@@ -210,7 +210,7 @@ async function parseWithAssistant(text) {
     return parseVoice(text);
   }
   try {
-    const { data, error } = await supabase.functions.invoke("parse-quote", { body: { text } });
+    const { data, error } = await supabase.functions.invoke("bright-worker", { body: { text } });
     if (error) throw error;
     return normalizeAiDraft(data, text);
   } catch (error) {
@@ -594,7 +594,7 @@ function splitLines(doc, text, maxWidth) {
   return doc.splitTextToSize(String(text || ""), maxWidth);
 }
 
-async function buildPdfBlob(source, folio = nextFolio()) {
+async function buildPdfDoc(source, folio = nextFolio()) {
   const quote = { ...source, folio, date: source.date || new Date().toISOString() };
   const quoteTotals = totals(quote);
   const doc = new jsPDF({ unit: "mm", format: "letter" });
@@ -698,17 +698,17 @@ async function buildPdfBlob(source, folio = nextFolio()) {
   doc.setFontSize(24);
   doc.text(`TOTAL ${money(quoteTotals.total)}`, cardX + cardW - 12, Math.min(y + 12, cardY + cardH - 16), { align: "right" });
 
+  return doc;
+}
+
+async function buildPdfBlob(source, folio = nextFolio()) {
+  const doc = await buildPdfDoc(source, folio);
   return doc.output("blob");
 }
 
 async function downloadPdf(source = draft, folio = nextFolio()) {
-  const blob = await buildPdfBlob(source, folio);
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileNameFor({ folio });
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1200);
+  const doc = await buildPdfDoc(source, folio);
+  doc.save(fileNameFor({ folio }));
 }
 
 async function sharePdf(source = draft, folio = nextFolio()) {
@@ -847,7 +847,17 @@ function setup() {
   document.getElementById("pdf-button").addEventListener("click", async () => {
     const missing = missingData();
     if (missing.length && !confirm(`Leonardo, faltan estos datos: ${missing.join(", ")}. Descargar PDF de todos modos?`)) return;
-    await downloadPdf(draft, nextFolio());
+    const button = document.getElementById("pdf-button");
+    const original = button.textContent;
+    try {
+      button.textContent = "GENERANDO PDF...";
+      await downloadPdf(draft, nextFolio());
+      alert("PDF generado. Revisa tus descargas o el visor que abrio Chrome.");
+    } catch (error) {
+      alert(`No se pudo generar el PDF: ${error.message || "intenta actualizar la app"}`);
+    } finally {
+      button.textContent = original;
+    }
   });
   document.getElementById("share-pdf-button").addEventListener("click", async () => {
     const missing = missingData();
@@ -855,8 +865,17 @@ function setup() {
       alert(`Leonardo, faltan estos datos antes de enviar el PDF: ${missing.join(", ")}.`);
       return;
     }
-    const quote = saveQuote("Enviada");
-    if (quote) await sharePdf(quote, quote.folio);
+    const button = document.getElementById("share-pdf-button");
+    const original = button.textContent;
+    try {
+      button.textContent = "PREPARANDO PDF...";
+      const quote = saveQuote("Enviada");
+      if (quote) await sharePdf(quote, quote.folio);
+    } catch (error) {
+      alert(`No se pudo compartir el PDF: ${error.message || "intenta descargarlo primero"}`);
+    } finally {
+      button.textContent = original;
+    }
   });
   document.getElementById("search").addEventListener("input", renderHistory);
   document.getElementById("history-list").addEventListener("click", async (event) => {
