@@ -177,6 +177,48 @@ async function syncCloudState() {
   if (error) console.warn("No se pudo sincronizar Supabase", error.message);
 }
 
+function normalizeAiDraft(data, originalText) {
+  const total = Number(data?.precio_total || data?.total || 0);
+  const subtotal = total > 0 ? Math.round((total / (1 + TAX)) * 100) / 100 : 0;
+  const conceptDescription = data?.concepto || data?.trabajo || "Servicio mecanico solicitado";
+  return {
+    clientName: data?.cliente || "",
+    clientPhone: "",
+    vehicle: data?.vehiculo || "",
+    brand: "",
+    model: "",
+    year: "",
+    plates: data?.placas || "",
+    diagnosis: data?.diagnostico || originalText,
+    technical: data?.redaccion_tecnica || technicalText(data?.diagnostico || originalText),
+    work: data?.trabajo || conceptDescription,
+    parts: data?.refacciones || "",
+    observations: data?.observaciones || "Vigencia de la cotizacion: 7 dias. Sujeto a revision fisica de la unidad.",
+    concepts: [
+      {
+        id: `c-${Date.now()}-ia`,
+        description: conceptDescription,
+        quantity: 1,
+        price: subtotal || Number(data?.subtotal || 0)
+      }
+    ]
+  };
+}
+
+async function parseWithAssistant(text) {
+  if (!SUPABASE_READY || !supabase) {
+    return parseVoice(text);
+  }
+  try {
+    const { data, error } = await supabase.functions.invoke("parse-quote", { body: { text } });
+    if (error) throw error;
+    return normalizeAiDraft(data, text);
+  } catch (error) {
+    console.warn("IA no disponible, usando extractor local", error.message);
+    return parseVoice(text);
+  }
+}
+
 function money(value) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value || 0);
 }
@@ -557,118 +599,104 @@ async function buildPdfBlob(source, folio = nextFolio()) {
   const quoteTotals = totals(quote);
   const doc = new jsPDF({ unit: "mm", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 14;
-  let y = 12;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 16;
+  const cardX = margin;
+  const cardY = 16;
+  const cardW = pageWidth - margin * 2;
+  const cardH = pageHeight - 32;
+  let y = cardY + 12;
 
   doc.setFillColor(8, 8, 8);
-  doc.rect(0, 0, pageWidth, 24, "F");
-  doc.setFillColor(255, 196, 0);
-  doc.rect(0, 24, pageWidth, 1.4, "F");
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  doc.setFillColor(246, 246, 241);
+  doc.roundedRect(cardX, cardY, cardW, cardH, 4, 4, "F");
 
   const logo = await imageDataUrl("./logo-solis.png");
-  if (logo) doc.addImage(logo, "PNG", margin, 8, 44, 27);
+  if (logo) doc.addImage(logo, "PNG", cardX + 10, y - 2, 45, 25);
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("TALLER SOLIS", 66, 14);
-  doc.setFontSize(9);
-  doc.text("A TUS ORDENES", 66, 20);
-  doc.setTextColor(255, 196, 0);
-  doc.text("COTIZADOR", 66, 25);
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
-  doc.text("Tel. 55 1234 5678", pageWidth - margin, 13, { align: "right" });
-  doc.text("Ciudad de Mexico", pageWidth - margin, 19, { align: "right" });
-
-  y = 40;
   doc.setTextColor(10, 10, 10);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.setFont("helvetica", "bold");
-  doc.text("COTIZACION", margin, y);
-  doc.setFontSize(10);
-  doc.text(`Folio: ${quote.folio}`, pageWidth - margin, y - 2, { align: "right" });
-  doc.text(`Fecha: ${new Date(quote.date).toLocaleDateString("es-MX")}`, pageWidth - margin, y + 4, { align: "right" });
+  doc.text("TALLER SOLIS", cardX + 66, y + 6);
+  doc.setFontSize(11);
+  doc.text("A TUS ORDENES", cardX + 66, y + 14);
 
-  y += 12;
-  doc.setDrawColor(20, 20, 20);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 8;
-
+  doc.setFontSize(20);
+  doc.text("COTIZACION", cardX + cardW - 10, y + 6, { align: "right" });
+  doc.setTextColor(170, 170, 170);
   doc.setFontSize(10);
+  doc.text(`Folio: ${quote.folio}`, cardX + cardW - 10, y + 16, { align: "right" });
+  doc.text(`Fecha: ${new Date(quote.date).toLocaleDateString("es-MX")}`, cardX + cardW - 10, y + 23, { align: "right" });
+
+  y += 38;
+  doc.setDrawColor(10, 10, 10);
+  doc.setLineWidth(0.8);
+  doc.line(cardX + 10, y, cardX + cardW - 10, y);
+  y += 11;
+
+  doc.setTextColor(10, 10, 10);
+  doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text("CLIENTE:", margin, y);
-  doc.text("VEHICULO:", margin, y + 6);
-  doc.text("PLACAS:", pageWidth / 2, y + 6);
+  doc.text("Cliente:", cardX + 10, y);
   doc.setFont("helvetica", "normal");
-  doc.text(splitLines(doc, quote.clientName || "Pendiente", 118), margin + 22, y);
-  doc.text(splitLines(doc, quote.vehicle || "Pendiente", 70), margin + 24, y + 6);
-  doc.text(quote.plates || "Pendiente", pageWidth / 2 + 18, y + 6);
-  y += 17;
-
-  doc.setFillColor(17, 17, 17);
-  doc.rect(margin, y, pageWidth - margin * 2, 8, "F");
-  doc.setTextColor(255, 255, 255);
+  doc.text(splitLines(doc, quote.clientName || "Pendiente", cardW - 42), cardX + 30, y);
+  y += 8;
   doc.setFont("helvetica", "bold");
-  doc.text("CONCEPTO", margin + 2, y + 5.5);
-  doc.text("CANT.", pageWidth - 62, y + 5.5, { align: "right" });
-  doc.text("PRECIO", pageWidth - 36, y + 5.5, { align: "right" });
-  doc.text("IMPORTE", pageWidth - margin - 2, y + 5.5, { align: "right" });
-  y += 10;
+  doc.text("Vehiculo:", cardX + 10, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(splitLines(doc, quote.vehicle || "Pendiente", cardW - 46), cardX + 34, y);
+  y += 14;
+
+  doc.setTextColor(10, 10, 10);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Concepto", cardX + 12, y);
+  doc.text("Importe", cardX + cardW - 12, y, { align: "right" });
+  y += 7;
+  doc.setDrawColor(200, 200, 195);
+  doc.setLineWidth(0.3);
+  doc.line(cardX + 10, y, cardX + cardW - 10, y);
+  y += 9;
 
   doc.setTextColor(10, 10, 10);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
   quote.concepts.forEach((item) => {
-    const lines = splitLines(doc, item.description, 92);
-    doc.text(lines, margin + 2, y);
-    doc.text(String(item.quantity || 1), pageWidth - 62, y, { align: "right" });
-    doc.text(money(item.price), pageWidth - 36, y, { align: "right" });
-    doc.text(money(item.quantity * item.price), pageWidth - margin - 2, y, { align: "right" });
-    y += Math.max(8, lines.length * 5 + 2);
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, y - 3, pageWidth - margin, y - 3);
+    const lines = splitLines(doc, item.description, 118);
+    doc.text(lines, cardX + 12, y);
+    doc.text(money(item.quantity * item.price), cardX + cardW - 12, y, { align: "right" });
+    y += Math.max(8, lines.length * 6 + 2);
+    doc.setDrawColor(215, 215, 210);
+    doc.line(cardX + 10, y - 3, cardX + cardW - 10, y - 3);
   });
 
-  y += 4;
-  doc.setFont("helvetica", "bold");
-  doc.text("SUBTOTAL", pageWidth - 62, y, { align: "right" });
-  doc.text(money(quoteTotals.subtotal), pageWidth - margin - 2, y, { align: "right" });
-  y += 6;
-  doc.text("IVA 16%", pageWidth - 62, y, { align: "right" });
-  doc.text(money(quoteTotals.iva), pageWidth - margin - 2, y, { align: "right" });
-  y += 8;
-  doc.setTextColor(255, 196, 0);
-  doc.setFontSize(16);
-  doc.text("TOTAL", pageWidth - 62, y, { align: "right" });
-  doc.text(money(quoteTotals.total), pageWidth - margin - 2, y, { align: "right" });
-
-  y += 14;
+  y += 7;
   doc.setTextColor(10, 10, 10);
-  doc.setFontSize(11);
-  doc.text("DIAGNOSTICO TECNICO / OBSERVACIONES", margin, y);
-  y += 6;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  const diagnosisLines = splitLines(doc, quote.technical || quote.diagnosis || "", pageWidth - margin * 2);
-  doc.text(diagnosisLines, margin, y);
-  y += diagnosisLines.length * 5 + 10;
-  const observationLines = splitLines(doc, quote.observations || "Vigencia de la cotizacion: 7 dias.", pageWidth - margin * 2);
-  doc.text(observationLines, margin, y);
-
-  y = 245;
-  doc.setDrawColor(80, 80, 80);
-  doc.line(margin, y, 86, y);
-  doc.line(pageWidth - 86, y, pageWidth - margin, y);
   doc.setFont("helvetica", "bold");
-  doc.text("AUTORIZA CLIENTE", margin, y + 6);
-  doc.text("TALLER SOLIS", pageWidth - 86, y + 6);
+  doc.setFontSize(13);
+  doc.text("Diagnostico / observaciones", cardX + 10, y);
+  y += 8;
 
-  doc.setFillColor(8, 8, 8);
-  doc.rect(0, 265, pageWidth, 14, "F");
-  doc.setTextColor(255, 196, 0);
-  doc.setFontSize(10);
-  doc.text("Profesional, rapido y facil. A tus ordenes.", pageWidth / 2, 273, { align: "center" });
+  const diagnosisText = quote.technical || quote.diagnosis || "Pendiente";
+  const diagnosisLines = splitLines(doc, diagnosisText, cardW - 20);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text(diagnosisLines, cardX + 10, y);
+  y += diagnosisLines.length * 6 + 6;
+
+  if (quote.observations) {
+    const observationLines = splitLines(doc, quote.observations, cardW - 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(observationLines, cardX + 10, y);
+    y += observationLines.length * 5 + 8;
+  }
+
+  doc.setTextColor(10, 10, 10);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(24);
+  doc.text(`TOTAL ${money(quoteTotals.total)}`, cardX + cardW - 12, Math.min(y + 12, cardY + cardH - 16), { align: "right" });
 
   return doc.output("blob");
 }
@@ -775,8 +803,10 @@ function setup() {
     }
   });
   document.getElementById("dictation").value = sampleDictation;
-  document.getElementById("parse-button").addEventListener("click", () => {
-    draft = parseVoice(document.getElementById("dictation").value);
+  document.getElementById("parse-button").addEventListener("click", async () => {
+    document.getElementById("parse-button").textContent = "LEONARDO ESTA PENSANDO...";
+    draft = await parseWithAssistant(document.getElementById("dictation").value);
+    document.getElementById("parse-button").textContent = "ORDENAR CON IA";
     render();
   });
   document.getElementById("listen-button").addEventListener("click", () => {
@@ -789,9 +819,9 @@ function setup() {
     }
     const recognition = new Recognition();
     recognition.lang = "es-MX";
-    recognition.onresult = (event) => {
+    recognition.onresult = async (event) => {
       document.getElementById("dictation").value = event.results[0][0].transcript;
-      draft = parseVoice(document.getElementById("dictation").value);
+      draft = await parseWithAssistant(document.getElementById("dictation").value);
       render();
     };
     recognition.start();
