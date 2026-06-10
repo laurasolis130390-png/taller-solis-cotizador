@@ -258,6 +258,28 @@ button {
   margin-bottom: 14px;
 }
 
+.assistant-welcome {
+  border: 1px solid rgba(255, 196, 0, 0.5);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 196, 0, 0.16), rgba(255, 196, 0, 0.04));
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.assistant-welcome strong {
+  display: block;
+  color: var(--gold);
+  font-size: 19px;
+  font-weight: 950;
+  margin-bottom: 5px;
+}
+
+.voice-intro {
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .metrics article {
   min-height: 92px;
   border-radius: 8px;
@@ -292,6 +314,35 @@ button {
   color: #050505;
   font-size: 23px;
   font-weight: 950;
+}
+
+.ai-panel {
+  border: 1px solid rgba(255, 196, 0, 0.55);
+  border-radius: 8px;
+  background: rgba(255, 196, 0, 0.08);
+  padding: 12px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.ai-panel strong {
+  display: block;
+  color: var(--gold);
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.ai-panel p {
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.ai-warning {
+  color: #ffd76a;
+}
+
+.ai-ok {
+  color: #8df0ab;
 }
 
 .form-grid {

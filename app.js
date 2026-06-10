@@ -223,6 +223,59 @@ function findMoneyNear(text, words) {
   return amountFrom(segment.match(/\$?\s*\d[\d,.\s]*/)?.[0] || "") || wordsToAmount(segment);
 }
 
+function cleanPersonName(value) {
+  return String(value || "")
+    .replace(/\b(ahora|ahorita|tiene|trae|con|y|me|dice|le|su)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .trim();
+}
+
+function extractClient(clean) {
+  const patterns = [
+    /cliente\s+(?:que\s+)?(?:se\s+llama|llamado|nombre)?\s*([a-z\s]{3,45}?)(?=\s+(?:tiene|trae|con|vino|llego|me|dice|le|su)\b|[,.;]|$)/i,
+    /(?:se llama|a nombre de|nombre de)\s+([a-z\s]{3,45}?)(?=\s+(?:tiene|trae|con|vino|llego|me|dice|le|su)\b|[,.;]|$)/i
+  ];
+  for (const pattern of patterns) {
+    const match = clean.match(pattern);
+    const name = cleanPersonName(match?.[1]);
+    if (name) return titleCase(name);
+  }
+  return "";
+}
+
+function extractVehicle(clean) {
+  const brands = "(nissan|ford|chevrolet|chevy|toyota|volkswagen|vw|honda|mazda|kia|hyundai|dodge|aveo|versa|tsuru|sentra|march|np300|jetta|vento|spark|fiesta|focus)";
+  const match =
+    clean.match(new RegExp(`(?:tiene|trae|con|es|vehiculo|carro|coche|camioneta|unidad)\\s+(?:un|una)?\\s*(${brands}[^,.;]*)`, "i")) ||
+    clean.match(new RegExp(`\\b(${brands}\\s+[a-z0-9\\s-]{0,30})`, "i"));
+  return titleCase((match?.[1] || "").replace(/\s+/g, " "));
+}
+
+function extractWork(clean) {
+  const lower = clean.toLowerCase();
+  const direct = clean.match(/(?:hay que|ay que|se debe|necesita|ocupa|requiere|toca)\s+([^,.]+)/i)?.[1]?.trim();
+  if (direct) return titleCase(direct);
+  if (lower.includes("horquilla") || lower.includes("orquilla")) return "Cambio de horquilla lado conductor";
+  if (lower.includes("clutch") || lower.includes("embrague")) return "Cambio de clutch completo";
+  if (lower.includes("freno") || lower.includes("balata")) return "Servicio de frenos";
+  if (lower.includes("afinacion")) return "Afinacion";
+  return "Servicio mecanico solicitado";
+}
+
+function extractDiagnosis(clean) {
+  const direct =
+    clean.match(/(?:le encontre|se encontro|tiene|trae|presenta|suena|se escucha|diagnostico)\s+([^,.]+)/i)?.[1]?.trim() ||
+    "";
+  return direct ? titleCase(direct) : titleCase(clean);
+}
+
 function technicalText(text) {
   const base = text.trim() || "se detecta una falla reportada por el cliente";
   return `Se detecta ${base.toLowerCase().replace(/\.$/, "")}. La condicion compromete el funcionamiento correcto de la unidad, por lo que se recomienda realizar la reparacion indicada, sustituir los componentes necesarios y verificar el sistema mediante prueba de funcionamiento posterior.`;
@@ -231,60 +284,56 @@ function technicalText(text) {
 function parseVoice(text) {
   const clean = plain(text);
   const lower = clean.toLowerCase();
-  const client =
-    clean.match(/cliente\s+([^,.]+)/i)?.[1]?.trim() ||
-    clean.match(/(?:se llama|a nombre de|nombre)\s+([^,.]+)/i)?.[1]?.trim() ||
-    "";
-  const phone = clean.match(/(?:telefono|tel|celular|whatsapp)\s*:?\s*([0-9\s-]{7,})/i)?.[1]?.trim() || "";
-  const vehicle = clean.match(/(nissan|ford|chevrolet|toyota|volkswagen|honda|mazda|kia|hyundai|dodge)\s+([^,]+)/i);
-  const year = clean.match(/\b(19|20)\d{2}\b/)?.[0] || "";
+  const client = extractClient(clean);
+  const vehicleText = extractVehicle(clean);
   const plates = clean.match(/(?:placas|placa)\s*:?\s*([a-z0-9-]{5,10})/i)?.[1]?.toUpperCase() || "";
-  const diagnosis =
-    clean.match(/diagnostico:?\s*(.+)$/i)?.[1]?.trim() ||
-    clean.match(/(?:falla|problema|situacion|le pasa que)\s+(.+)/i)?.[1]?.trim() ||
-    clean;
+  const diagnosis = extractDiagnosis(clean);
   const labor = findMoneyNear(clean, ["mano de obra", "obra", "labor"]);
   const partsPrice = findMoneyNear(clean, ["refaccion", "refacciones", "partes", "kit", "plato", "disco", "balero"]);
+  const totalPrice = findMoneyNear(clean, ["precio total", "total", "todo", "le cuesta", "cuesta", "sale en", "queda en"]);
   const clutch = lower.includes("clutch") || lower.includes("embrague");
   const brakes = lower.includes("freno") || lower.includes("balata");
-  const tuning = lower.includes("afinacion") || lower.includes("servicio");
-  const work = clutch ? "Cambio de clutch completo" : brakes ? "Servicio de frenos" : tuning ? "Servicio mecanico / afinacion" : "Servicio mecanico solicitado";
+  const work = extractWork(clean);
   const parts = clutch
     ? ["plato de presion", "disco", "balero"].filter((item) => lower.includes(item.split(" ")[0]) || item === "plato de presion").join(", ")
     : brakes
       ? "Balatas y revision de sistema de frenos"
-      : clean.match(/(?:incluye|lleva|ocupa|necesita)\s+([^,.]+)/i)?.[1]?.trim() || "";
+      : lower.includes("horquilla") || lower.includes("orquilla")
+        ? "Horquilla lado conductor"
+        : clean.match(/(?:incluye|lleva|ocupa|necesita)\s+([^,.]+)/i)?.[1]?.trim() || "";
   const firstPrice = amountFrom(clean.match(/\$?\s*\d[\d,.\s]*/)?.[0] || "") || wordsToAmount(clean);
-  const fallbackTotal = labor || partsPrice || firstPrice;
+  const fallbackTotal = totalPrice || labor || partsPrice || firstPrice;
+  const finalPriceAsSubtotal = totalPrice ? Math.round((totalPrice / (1 + TAX)) * 100) / 100 : 0;
+  const concepts = totalPrice
+    ? [{ id: `c-${Date.now()}-1`, description: parts ? `${work} (${parts})` : work, quantity: 1, price: finalPriceAsSubtotal }]
+    : [
+        { id: `c-${Date.now()}-1`, description: parts ? `${work} (${parts})` : work, quantity: 1, price: partsPrice || Math.max(fallbackTotal - (labor || 0), 0) },
+        { id: `c-${Date.now()}-2`, description: "Mano de obra", quantity: 1, price: labor || (partsPrice ? 0 : fallbackTotal) }
+      ].filter((item) => item.price > 0 || item.description !== "Mano de obra");
   return {
     clientName: client,
-    clientPhone: phone,
-    vehicle: vehicle?.[0]?.trim() || "",
-    brand: vehicle?.[1]?.trim() || "",
-    model: (vehicle?.[2] || "").replace(year, "").trim(),
-    year,
+    clientPhone: "",
+    vehicle: vehicleText,
+    brand: "",
+    model: "",
+    year: "",
     plates,
     diagnosis,
     technical: technicalText(diagnosis),
     work,
     parts,
     observations: "Vigencia de la cotizacion: 7 dias. Sujeto a revision fisica de la unidad.",
-    concepts: [
-      { id: `c-${Date.now()}-1`, description: parts ? `${work} (${parts})` : work, quantity: 1, price: partsPrice || Math.max(fallbackTotal - (labor || 0), 0) },
-      { id: `c-${Date.now()}-2`, description: "Mano de obra", quantity: 1, price: labor || (partsPrice ? 0 : fallbackTotal) }
-    ]
+    concepts
   };
 }
 
 function missingData(source = draft) {
   const missing = [];
   if (!source.clientName.trim()) missing.push("nombre del cliente");
-  if (!source.clientPhone.trim()) missing.push("telefono o WhatsApp del cliente");
   if (!source.vehicle.trim()) missing.push("vehiculo");
-  if (!source.year.trim()) missing.push("ano del vehiculo");
   if (!source.diagnosis.trim()) missing.push("diagnostico o problema");
   if (!source.work.trim()) missing.push("trabajo a realizar");
-  if (!source.concepts.some((item) => item.price > 0)) missing.push("importe de refacciones o mano de obra");
+  if (!source.concepts.some((item) => item.price > 0)) missing.push("precio total o importe");
   return missing;
 }
 
@@ -298,11 +347,11 @@ function renderAiPanel() {
   ].filter(Boolean);
   document.getElementById("ai-panel").innerHTML = `
     <strong>Leonardo</strong>
-    <p>${found.length ? `Entendi esto: ${found.join(" | ")}.` : "Cuentame la situacion como te la diga el cliente. Yo acomodo los datos."}</p>
+    <p>${found.length ? `Entendi esto: ${found.join(" | ")}.` : "Hola Leonardo, en que te puedo ayudar? Cuentame la situacion como te la diga el cliente y yo acomodo los datos."}</p>
     ${
       missing.length
         ? `<p class="ai-warning">Faltan estos datos para llenar bien la cotizacion: ${missing.join(", ")}.</p>
-           <p>Me los puedes dictar en una frase, por ejemplo: "El cliente se llama..., su telefono es..., el total de mano de obra es...".</p>`
+           <p>Me los puedes dictar en una frase, por ejemplo: "Leonardo, el cliente se llama..., trae un..., hay que cambiar..., precio total...".</p>`
         : `<p class="ai-ok">Ya tengo los datos principales. Revisa importes y puedes generar la cotizacion.</p>`
     }
   `;
@@ -339,11 +388,8 @@ function persistAndRender() {
 function bindDraft() {
   const fields = {
     "client-name": "clientName",
-    "client-phone": "clientPhone",
     vehicle: "vehicle",
     brand: "brand",
-    model: "model",
-    year: "year",
     plates: "plates",
     diagnosis: "diagnosis",
     work: "work",
@@ -466,10 +512,9 @@ function saveQuote(status) {
   state.quotes = [quote, ...state.quotes];
   const existing = state.clients.find((client) => client.name.toLowerCase() === quote.clientName.toLowerCase());
   if (existing) {
-    existing.phone = quote.clientPhone || existing.phone;
     existing.vehicles = Array.from(new Set([...existing.vehicles, quote.vehicle].filter(Boolean)));
   } else {
-    state.clients.unshift({ id: `cl-${Date.now()}`, name: quote.clientName || "Cliente sin nombre", phone: quote.clientPhone, vehicles: [quote.vehicle].filter(Boolean) });
+    state.clients.unshift({ id: `cl-${Date.now()}`, name: quote.clientName || "Cliente sin nombre", phone: "", vehicles: [quote.vehicle].filter(Boolean) });
   }
   syncCloudState();
   alert(`Cotizacion ${quote.folio} guardada.`);
@@ -555,12 +600,10 @@ async function buildPdfBlob(source, folio = nextFolio()) {
   doc.setFont("helvetica", "bold");
   doc.text("CLIENTE:", margin, y);
   doc.text("VEHICULO:", margin, y + 6);
-  doc.text("TELEFONO:", pageWidth / 2, y);
   doc.text("PLACAS:", pageWidth / 2, y + 6);
   doc.setFont("helvetica", "normal");
-  doc.text(quote.clientName || "Pendiente", margin + 22, y);
-  doc.text(quote.vehicle || "Pendiente", margin + 24, y + 6);
-  doc.text(quote.clientPhone || "Pendiente", pageWidth / 2 + 23, y);
+  doc.text(splitLines(doc, quote.clientName || "Pendiente", 118), margin + 22, y);
+  doc.text(splitLines(doc, quote.vehicle || "Pendiente", 70), margin + 24, y + 6);
   doc.text(quote.plates || "Pendiente", pageWidth / 2 + 18, y + 6);
   y += 17;
 

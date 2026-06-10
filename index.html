@@ -40,6 +40,10 @@
           </div>
         </header>
         <h1>Dicta, revisa, cotiza y envia en segundos.</h1>
+        <article class="assistant-welcome">
+          <strong>Hola Leonardo</strong>
+          <p>Estoy listo para ayudarte. Cuentame el caso del cliente y yo acomodo la cotizacion.</p>
+        </article>
         <div class="actions">
           <button class="primary full" data-go="quote">CREAR COTIZACION POR VOZ</button>
           <button class="ghost full" data-manual="true">NUEVA COTIZACION MANUAL</button>
@@ -71,6 +75,7 @@
         <article class="mic-card">
           <div class="mic" id="mic-status">MIC</div>
           <h2 id="listen-label">Dictado por voz</h2>
+          <p class="voice-intro">Hola Leonardo, dime que necesita el cliente, que vehiculo trae y cuanto cuesta el trabajo.</p>
           <label>Texto dictado<textarea id="dictation" rows="5"></textarea></label>
           <div class="actions">
             <button class="primary" id="listen-button">GRABAR</button>
@@ -81,11 +86,8 @@
         <article class="panel form-grid">
           <h2>Revision editable</h2>
           <label>Cliente<input id="client-name" /></label>
-          <label>Telefono<input id="client-phone" /></label>
           <label>Vehiculo<input id="vehicle" /></label>
           <label>Marca<input id="brand" /></label>
-          <label>Modelo<input id="model" /></label>
-          <label>Ano<input id="year" inputmode="numeric" /></label>
           <label>Placas<input id="plates" /></label>
           <label class="wide">Diagnostico simple<textarea id="diagnosis" rows="3"></textarea></label>
           <label>Trabajo a realizar<input id="work" /></label>
