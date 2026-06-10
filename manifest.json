@@ -1,8 +1,10 @@
 {
   "name": "Taller Solis Cotizador",
-  "short_name": "Cotizador Solis",
+  "short_name": "Taller Solis",
   "description": "Cotizador profesional para taller mecanico con historial, folio y WhatsApp.",
+  "id": "taller-solis-cotizador",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#050505",
   "theme_color": "#050505",
@@ -12,13 +14,19 @@
       "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "./icon.svg",
