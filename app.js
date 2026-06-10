@@ -18,7 +18,13 @@ let currentUser = null;
 let isAuthenticated = false;
 let biometricEnabled = false;
 let biometricAvailable = false;
-let soundEnabled = localStorage.getItem(SOUND_KEY) === "on";
+let soundEnabled = (() => {
+  try {
+    return localStorage.getItem(SOUND_KEY) === "on";
+  } catch {
+    return false;
+  }
+})();
 let audioContext = null;
 let musicTimer = null;
 let welcomeSpoken = false;
@@ -120,7 +126,11 @@ function startBackgroundMusic() {
 
 function stopBackgroundMusic() {
   soundEnabled = false;
-  localStorage.setItem(SOUND_KEY, "off");
+  try {
+    localStorage.setItem(SOUND_KEY, "off");
+  } catch {
+    // Some browsers block storage in strict modes; sound can still be toggled for the session.
+  }
   if (musicTimer) window.clearTimeout(musicTimer);
   musicTimer = null;
   if (audioContext) {
@@ -155,7 +165,12 @@ function updateSoundButton() {
 
 async function toggleSound() {
   soundEnabled = !soundEnabled;
-  localStorage.setItem(SOUND_KEY, soundEnabled ? "on" : "off");
+  try {
+    localStorage.setItem(SOUND_KEY, soundEnabled ? "on" : "off");
+  } catch {
+    // Keep the visible state even if the browser refuses local storage.
+  }
+  updateSoundButton();
   if (soundEnabled) {
     startBackgroundMusic();
     if (audioContext?.state === "suspended") await audioContext.resume();
