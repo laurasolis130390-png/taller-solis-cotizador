@@ -1,4 +1,4 @@
-const CACHE_NAME = "taller-solis-cotizador-v3";
+const CACHE_NAME = "taller-solis-cotizador-v5";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./supabase-config.js", "./manifest.json", "./icon.svg", "./logo-solis.png"];
 
 self.addEventListener("install", (event) => {
