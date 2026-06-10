@@ -15,6 +15,7 @@ let state = loadState();
 let draft = parseVoice(sampleDictation);
 let listening = false;
 let currentUser = null;
+let isAuthenticated = false;
 let biometricEnabled = false;
 let biometricAvailable = false;
 let soundEnabled = localStorage.getItem(SOUND_KEY) === "on";
@@ -500,9 +501,18 @@ function nextFolio() {
 }
 
 function go(screen) {
+  if (!isAuthenticated && screen !== "login") {
+    document.querySelectorAll(".screen").forEach((item) => item.classList.remove("active"));
+    document.querySelector("#screen-login").classList.add("active");
+    document.querySelector(".tabbar")?.classList.add("locked");
+    document.getElementById("login-message").textContent = "Primero entra con contrasena o huella para usar la app.";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
   document.querySelectorAll(".screen").forEach((item) => item.classList.remove("active"));
   document.querySelector(`#screen-${screen}`).classList.add("active");
   document.querySelectorAll(".tabbar button").forEach((button) => button.classList.toggle("active", button.dataset.go === screen));
+  document.querySelector(".tabbar")?.classList.toggle("locked", !isAuthenticated);
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -845,6 +855,7 @@ function setup() {
     const pass = document.getElementById("login-password").value;
     document.getElementById("login-message").textContent = "Validando acceso...";
     if (await signIn(user, pass)) {
+      isAuthenticated = true;
       document.getElementById("login-message").textContent = SUPABASE_READY ? "Datos conectados a Supabase." : "Modo local activo.";
       if (biometricAvailable && !localStorage.getItem(BIOMETRIC_KEY) && confirm("Quieres activar huella en este celular?")) {
         try {
@@ -872,6 +883,7 @@ function setup() {
       document.getElementById("login-message").textContent = "Abriendo huella del celular...";
       if (localStorage.getItem(BIOMETRIC_KEY)) {
         await unlockWithBiometric();
+        isAuthenticated = true;
         document.getElementById("login-message").textContent = "Acceso con huella correcto.";
         go("home");
         playWelcome();
@@ -884,6 +896,7 @@ function setup() {
       }
 
       await registerBiometric(user);
+      isAuthenticated = true;
       document.getElementById("finger-hint").textContent = "Huella activada en este celular.";
       document.getElementById("login-message").textContent = "Huella activada. Entrando...";
       go("home");
