@@ -1,5 +1,16 @@
-const CACHE_NAME = "taller-solis-cotizador-v10";
-const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./supabase-config.js", "./manifest.json", "./icon.svg", "./logo-solis.png"];
+const CACHE_NAME = "taller-solis-cotizador-v12";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./styles.css",
+  "./app.js",
+  "./supabase-config.js",
+  "./manifest.json",
+  "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./logo-solis.png"
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));

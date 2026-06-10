@@ -4,6 +4,7 @@ import { LOCAL_DEMO_PASSWORD, LOCAL_DEMO_USER, SUPABASE_ANON_KEY, SUPABASE_URL }
 
 const STORAGE_KEY = "taller-solis-web";
 const BIOMETRIC_KEY = "taller-solis-biometric";
+const SOUND_KEY = "taller-solis-sound";
 const TAX = 0.16;
 const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const supabase = SUPABASE_READY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -16,6 +17,10 @@ let listening = false;
 let currentUser = null;
 let biometricEnabled = false;
 let biometricAvailable = false;
+let soundEnabled = localStorage.getItem(SOUND_KEY) === "on";
+let audioContext = null;
+let musicTimer = null;
+let welcomeSpoken = false;
 
 function starterState() {
   const quote = {
@@ -78,6 +83,86 @@ function randomChallenge() {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return bytes;
+}
+
+function playTone(frequency, startAt, duration, gainValue = 0.035, type = "sine") {
+  if (!audioContext) return;
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startAt);
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.exponentialRampToValueAtTime(gainValue, startAt + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start(startAt);
+  oscillator.stop(startAt + duration + 0.04);
+}
+
+function startBackgroundMusic() {
+  if (!soundEnabled || audioContext) return;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  audioContext = new AudioCtx();
+  const loop = () => {
+    if (!audioContext || !soundEnabled) return;
+    const now = audioContext.currentTime + 0.05;
+    playTone(164.81, now, 1.8, 0.026, "triangle");
+    playTone(246.94, now + 0.45, 1.4, 0.018, "sine");
+    playTone(329.63, now + 1.15, 1.1, 0.014, "sine");
+    playTone(61.74, now + 0.02, 0.18, 0.022, "sawtooth");
+    musicTimer = window.setTimeout(loop, 2600);
+  };
+  loop();
+}
+
+function stopBackgroundMusic() {
+  soundEnabled = false;
+  localStorage.setItem(SOUND_KEY, "off");
+  if (musicTimer) window.clearTimeout(musicTimer);
+  musicTimer = null;
+  if (audioContext) {
+    audioContext.close().catch(() => undefined);
+    audioContext = null;
+  }
+  window.speechSynthesis?.cancel();
+}
+
+function speak(text) {
+  if (!soundEnabled || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "es-MX";
+  utterance.rate = 0.94;
+  utterance.pitch = 0.92;
+  window.speechSynthesis.speak(utterance);
+}
+
+function playWelcome(force = false) {
+  if (!force && welcomeSpoken) return;
+  welcomeSpoken = true;
+  speak("Hola Leonardo. Bienvenido a Taller Solis Cotizador. Estoy lista para ayudarte a crear cotizaciones.");
+}
+
+function updateSoundButton() {
+  const button = document.getElementById("sound-button");
+  if (!button) return;
+  button.classList.toggle("active", soundEnabled);
+  button.textContent = soundEnabled ? "VOZ Y MUSICA ACTIVAS" : "ACTIVAR VOZ Y MUSICA";
+}
+
+async function toggleSound() {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem(SOUND_KEY, soundEnabled ? "on" : "off");
+  if (soundEnabled) {
+    startBackgroundMusic();
+    if (audioContext?.state === "suspended") await audioContext.resume();
+    playWelcome(true);
+  } else {
+    stopBackgroundMusic();
+  }
+  updateSoundButton();
 }
 
 async function registerBiometric(userName) {
@@ -733,6 +818,8 @@ function escapeHtml(value) {
 
 function setup() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => go(button.dataset.go)));
+  updateSoundButton();
+  document.getElementById("sound-button")?.addEventListener("click", toggleSound);
   biometricEnabled = Boolean(localStorage.getItem(BIOMETRIC_KEY));
   checkBiometricAvailability().then((available) => {
     biometricAvailable = available;
@@ -769,6 +856,7 @@ function setup() {
         }
       }
       go("home");
+      playWelcome();
     } else {
       document.getElementById("login-message").textContent = "Usuario o contrasena incorrectos.";
     }
@@ -786,6 +874,7 @@ function setup() {
         await unlockWithBiometric();
         document.getElementById("login-message").textContent = "Acceso con huella correcto.";
         go("home");
+        playWelcome();
         return;
       }
 
@@ -798,6 +887,7 @@ function setup() {
       document.getElementById("finger-hint").textContent = "Huella activada en este celular.";
       document.getElementById("login-message").textContent = "Huella activada. Entrando...";
       go("home");
+      playWelcome();
     } catch (error) {
       document.getElementById("login-message").textContent = error.message || "No se pudo usar la huella.";
     }
@@ -808,6 +898,12 @@ function setup() {
     draft = await parseWithAssistant(document.getElementById("dictation").value);
     document.getElementById("parse-button").textContent = "ORDENAR CON IA";
     render();
+    const missing = missingData();
+    speak(
+      missing.length
+        ? `Leonardo, ya acomode lo que entendi. Me faltan estos datos: ${missing.join(", ")}.`
+        : "Leonardo, ya acomode la cotizacion. Revisa los datos y puedes generar el PDF."
+    );
   });
   document.getElementById("listen-button").addEventListener("click", () => {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -823,6 +919,12 @@ function setup() {
       document.getElementById("dictation").value = event.results[0][0].transcript;
       draft = await parseWithAssistant(document.getElementById("dictation").value);
       render();
+      const missing = missingData();
+      speak(
+        missing.length
+          ? `Leonardo, entendi el caso. Faltan estos datos: ${missing.join(", ")}.`
+          : "Leonardo, ya tengo los datos principales de la cotizacion."
+      );
     };
     recognition.start();
   });

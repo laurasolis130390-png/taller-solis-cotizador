@@ -128,6 +128,20 @@ li {
   font-weight: 950;
 }
 
+.sound-toggle {
+  width: 100%;
+  margin: -6px 0 14px;
+  border: 1px solid rgba(255, 196, 0, 0.8);
+  background: linear-gradient(135deg, rgba(255, 196, 0, 0.18), rgba(17, 19, 24, 0.98));
+  color: var(--gold);
+  box-shadow: 0 0 18px rgba(255, 196, 0, 0.16);
+}
+
+.sound-toggle.active {
+  background: var(--gold);
+  color: #050505;
+}
+
 .brand.compact {
   display: inline-grid;
   grid-template-columns: 74px 1fr;
