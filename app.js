@@ -335,6 +335,56 @@ async function parseWithAssistant(text) {
   }
 }
 
+function hasPositiveConcept(source) {
+  return Boolean(source?.concepts?.some((item) => Number(item.price) > 0));
+}
+
+function mergeDraft(previous, incoming, spokenText = "") {
+  const merged = structuredClone(previous);
+  const incomingMissing = missingData(incoming);
+  const hasUsefulText = (value) => String(value || "").trim() && !/^pendiente$/i.test(String(value || "").trim());
+  const text = plain(spokenText).toLowerCase();
+
+  if (hasUsefulText(incoming.clientName)) merged.clientName = incoming.clientName;
+  if (hasUsefulText(incoming.vehicle)) merged.vehicle = incoming.vehicle;
+  if (hasUsefulText(incoming.brand)) merged.brand = incoming.brand;
+  if (hasUsefulText(incoming.plates)) merged.plates = incoming.plates;
+  if (hasUsefulText(incoming.work) && incoming.work !== "Servicio mecanico solicitado") merged.work = incoming.work;
+  if (hasUsefulText(incoming.parts)) merged.parts = incoming.parts;
+
+  if (hasUsefulText(incoming.diagnosis) && !/^se llama|cliente\s/i.test(incoming.diagnosis)) {
+    merged.diagnosis = incoming.diagnosis;
+  }
+
+  if (hasUsefulText(incoming.technical) && !/^se detecta se llama|^se detecta cliente/i.test(incoming.technical)) {
+    merged.technical = incoming.technical;
+  }
+
+  if (hasUsefulText(incoming.observations)) merged.observations = incoming.observations;
+
+  if (hasPositiveConcept(incoming)) {
+    merged.concepts = incoming.concepts;
+  } else if (hasUsefulText(incoming.work) && merged.concepts?.length) {
+    merged.concepts = merged.concepts.map((item, index) => (index === 0 ? { ...item, description: incoming.work } : item));
+  }
+
+  if (!hasPositiveConcept(incoming) && /\b(precio|cuesta|total|pesos?|mxn)\b/.test(text)) {
+    const amount = moneyFromText(spokenText);
+    if (amount) {
+      const price = Math.round((amount / (1 + TAX)) * 100) / 100;
+      merged.concepts = [{ id: `c-${Date.now()}-merge`, description: merged.work || "Servicio mecanico solicitado", quantity: 1, price }];
+    }
+  }
+
+  if (!incomingMissing.includes("diagnostico o problema") && hasUsefulText(incoming.diagnosis)) {
+    merged.technical = incoming.technical || technicalText(incoming.diagnosis);
+  } else if (merged.diagnosis && !merged.technical) {
+    merged.technical = technicalText(merged.diagnosis);
+  }
+
+  return merged;
+}
+
 function money(value) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value || 0);
 }
@@ -568,7 +618,7 @@ function renderAiPanel() {
     ${
       missing.length
         ? `<p class="ai-warning">Faltan estos datos para llenar bien la cotizacion: ${missing.join(", ")}.</p>
-           <p>Me los puedes dictar en una frase, por ejemplo: "Leonardo, el cliente se llama..., trae un..., hay que cambiar..., precio total...".</p>`
+           <p>Me puedes contestar solo lo que falta. Por ejemplo: "Se llama Laura" o "El vehiculo es Aveo 2013". No borrare lo anterior.</p>`
         : `<p class="ai-ok">Ya tengo los datos principales. Revisa importes y puedes generar la cotizacion.</p>`
     }
   `;
@@ -918,6 +968,11 @@ function escapeHtml(value) {
 
 function setup() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => go(button.dataset.go)));
+  document.querySelector("[data-new-voice]").addEventListener("click", () => {
+    draft = parseVoice("");
+    document.getElementById("dictation").value = "";
+    go("quote");
+  });
   updateSoundButton();
   document.getElementById("sound-button")?.addEventListener("click", toggleSound);
   biometricEnabled = Boolean(localStorage.getItem(BIOMETRIC_KEY));
@@ -998,7 +1053,9 @@ function setup() {
   document.getElementById("dictation").value = sampleDictation;
   document.getElementById("parse-button").addEventListener("click", async () => {
     document.getElementById("parse-button").textContent = "LEONARDO ESTA PENSANDO...";
-    draft = await parseWithAssistant(document.getElementById("dictation").value);
+    const spokenText = document.getElementById("dictation").value;
+    const incoming = await parseWithAssistant(spokenText);
+    draft = mergeDraft(draft, incoming, spokenText);
     document.getElementById("parse-button").textContent = "ORDENAR CON IA";
     render();
     const missing = missingData();
@@ -1019,8 +1076,11 @@ function setup() {
     const recognition = new Recognition();
     recognition.lang = "es-MX";
     recognition.onresult = async (event) => {
-      document.getElementById("dictation").value = event.results[0][0].transcript;
-      draft = await parseWithAssistant(document.getElementById("dictation").value);
+      const spokenText = event.results[0][0].transcript;
+      const dictation = document.getElementById("dictation");
+      dictation.value = dictation.value.trim() ? `${dictation.value.trim()}\n${spokenText}` : spokenText;
+      const incoming = await parseWithAssistant(spokenText);
+      draft = mergeDraft(draft, incoming, spokenText);
       render();
       const missing = missingData();
       speak(
