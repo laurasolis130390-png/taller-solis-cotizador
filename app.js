@@ -261,13 +261,19 @@ async function unlockWithBiometric() {
 }
 
 async function signIn(user, password) {
+  const localLoginOk = user === LOCAL_DEMO_USER && password === LOCAL_DEMO_PASSWORD;
+
   if (!SUPABASE_READY) {
-    return user === LOCAL_DEMO_USER && password === LOCAL_DEMO_PASSWORD;
+    return localLoginOk;
   }
 
   const email = user.includes("@") ? user : `${user}@tallersolis.local`;
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) {
+    if (localLoginOk) {
+      currentUser = null;
+      return true;
+    }
     return false;
   }
 
@@ -1287,7 +1293,7 @@ function setup() {
     document.getElementById("login-message").textContent = "Validando acceso...";
     if (await signIn(user, pass)) {
       isAuthenticated = true;
-      document.getElementById("login-message").textContent = SUPABASE_READY ? "Datos conectados a Supabase." : "Modo local activo.";
+      document.getElementById("login-message").textContent = currentUser ? "Datos conectados a Supabase." : "Modo local activo.";
       if (biometricAvailable && !localStorage.getItem(BIOMETRIC_KEY) && confirm("Quieres activar huella en este celular?")) {
         try {
           await registerBiometric(user);
