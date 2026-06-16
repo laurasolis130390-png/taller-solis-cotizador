@@ -408,13 +408,35 @@ function smartTotals(source = smartDraft) {
   return { subtotal, iva, total: subtotal + iva };
 }
 
-function dataUrlFromFile(file) {
+function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
     reader.readAsDataURL(file);
   });
+}
+
+async function dataUrlFromFile(file) {
+  const original = await readFileAsDataUrl(file);
+  try {
+    const image = new Image();
+    image.src = original;
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+    });
+    const maxSide = 1400;
+    const ratio = Math.min(1, maxSide / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * ratio));
+    canvas.height = Math.max(1, Math.round(image.height * ratio));
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.78);
+  } catch {
+    return original;
+  }
 }
 
 function normalizeVehicleCard(data = {}) {
@@ -429,14 +451,16 @@ function normalizeVehicleCard(data = {}) {
 }
 
 async function analyzeVehicleCard(imageData) {
-  if (!SUPABASE_READY || !supabase || !imageData) return {};
+  if (!SUPABASE_READY || !supabase || !imageData) {
+    return { __error: "Supabase no esta conectado en esta version de la app." };
+  }
   try {
     const { data, error } = await supabase.functions.invoke("vehicle-card", { body: { image: imageData } });
     if (error) throw error;
     return normalizeVehicleCard(data);
   } catch (error) {
     console.warn("OCR de tarjeta no disponible", error.message);
-    return {};
+    return { __error: error.message || "No se pudo leer la tarjeta con IA." };
   }
 }
 
@@ -1323,8 +1347,15 @@ function setup() {
       button.textContent = "LEYENDO TARJETA...";
       status.textContent = "Analizando imagen. Revisa y corrige cualquier dato sugerido.";
       const vehicle = await analyzeVehicleCard(smartDraft.cardImage);
-      smartDraft.vehicle = { ...smartDraft.vehicle, ...Object.fromEntries(Object.entries(vehicle).filter(([, value]) => value)) };
-      smartDraft.aiMessage = Object.values(vehicle).some(Boolean)
+      if (vehicle.__error) {
+        status.textContent = "No se pudo leer con IA. Puedes llenar los datos manualmente.";
+        smartDraft.aiMessage = `OCR/IA no disponible: ${vehicle.__error}. Revisa que la funcion vehicle-card exista en Supabase.`;
+        return;
+      }
+      const cleanVehicle = Object.fromEntries(Object.entries(vehicle).filter(([key, value]) => key !== "__error" && value));
+      smartDraft.vehicle = { ...smartDraft.vehicle, ...cleanVehicle };
+      status.textContent = Object.values(cleanVehicle).some(Boolean) ? "Lectura terminada. Revisa los datos sugeridos." : "No encontre datos claros. Intenta otra foto mas derecha y con luz.";
+      smartDraft.aiMessage = Object.values(cleanVehicle).some(Boolean)
         ? "Datos de vehiculo sugeridos. Revisa placa, VIN, marca, modelo y ano antes de continuar."
         : "No pude extraer datos automaticamente. Puedes capturarlos manualmente.";
     } finally {
