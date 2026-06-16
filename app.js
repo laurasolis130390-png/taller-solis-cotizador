@@ -455,7 +455,7 @@ async function analyzeVehicleCard(imageData) {
     return { __error: "Supabase no esta conectado en esta version de la app." };
   }
   try {
-    const { data, error } = await supabase.functions.invoke("vehicle-card", { body: { image: imageData } });
+    const { data, error } = await supabase.functions.invoke("smooth-endpoint", { body: { image: imageData } });
     if (error) throw error;
     return normalizeVehicleCard(data);
   } catch (error) {
@@ -1349,7 +1349,7 @@ function setup() {
       const vehicle = await analyzeVehicleCard(smartDraft.cardImage);
       if (vehicle.__error) {
         status.textContent = "No se pudo leer con IA. Puedes llenar los datos manualmente.";
-        smartDraft.aiMessage = `OCR/IA no disponible: ${vehicle.__error}. Revisa que la funcion vehicle-card exista en Supabase.`;
+        smartDraft.aiMessage = `OCR/IA no disponible: ${vehicle.__error}. Revisa la funcion smooth-endpoint en Supabase.`;
         return;
       }
       const cleanVehicle = Object.fromEntries(Object.entries(vehicle).filter(([key, value]) => key !== "__error" && value));
