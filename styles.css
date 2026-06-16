@@ -222,6 +222,18 @@ textarea {
   font-weight: 750;
 }
 
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #090a0d;
+  color: var(--white);
+  padding: 12px;
+  margin-top: 6px;
+  outline: none;
+  font-weight: 750;
+}
+
 textarea {
   resize: vertical;
 }
@@ -382,6 +394,92 @@ button {
   margin-bottom: 10px;
 }
 
+.smart-step {
+  position: relative;
+}
+
+.step-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.step-title span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #050505;
+  font-weight: 950;
+}
+
+.upload-card {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  border: 1px dashed rgba(255, 196, 0, 0.7);
+  border-radius: 8px;
+  background: rgba(255, 196, 0, 0.08);
+  color: var(--white);
+  text-align: center;
+  padding: 18px;
+}
+
+.upload-card input {
+  display: none;
+}
+
+.upload-card strong {
+  color: var(--gold);
+  font-size: 18px;
+}
+
+.smart-preview {
+  display: none;
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 10px 0;
+  background: #070707;
+}
+
+.smart-preview.ready {
+  display: block;
+}
+
+.smart-line {
+  display: grid;
+  grid-template-columns: 1fr 112px;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.smart-line label:first-child,
+.smart-line .wide {
+  grid-column: 1 / -1;
+}
+
+.smart-line button {
+  align-self: end;
+}
+
+.smart-totals {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.smart-status button.active {
+  background: var(--gold);
+  color: #050505;
+}
+
 .quote-paper {
   background: #f4f4f0;
   color: #111;
@@ -490,7 +588,7 @@ th:last-child {
   width: 100%;
   max-width: 540px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
   background: rgba(5, 5, 5, 0.96);
   border-top: 1px solid var(--line);

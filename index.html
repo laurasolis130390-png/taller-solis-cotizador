@@ -53,6 +53,7 @@
           <p>Estoy listo para ayudarte. Cuentame el caso del cliente y yo acomodo la cotizacion.</p>
         </article>
         <div class="actions">
+          <button class="primary full" data-go="smart">COTIZACION INTELIGENTE</button>
           <button class="primary full" data-new-voice="true">CREAR COTIZACION POR VOZ</button>
           <button class="ghost full" data-manual="true">NUEVA COTIZACION MANUAL</button>
           <button class="ghost" data-go="history">HISTORIAL</button>
@@ -123,6 +124,80 @@
         </article>
       </section>
 
+      <section class="screen" id="screen-smart">
+        <header class="page-title">
+          <button class="back" data-go="home">VOLVER</button>
+          <h1>Cotizacion inteligente</h1>
+        </header>
+        <article class="assistant-welcome">
+          <strong>Flujo asistido</strong>
+          <p>Toma foto de la tarjeta, revisa los datos sugeridos, dicta el diagnostico y aprueba la precotizacion antes de guardarla.</p>
+        </article>
+
+        <article class="panel smart-step">
+          <div class="step-title"><span>1</span><h2>Tarjeta de circulacion</h2></div>
+          <label class="upload-card">
+            <input id="smart-card-photo" type="file" accept="image/*" capture="environment" />
+            <strong>Tomar o subir foto</strong>
+            <small>La IA solo sugiere datos. Siempre revisa antes de continuar.</small>
+          </label>
+          <img id="smart-card-preview" class="smart-preview" alt="Vista previa de tarjeta" />
+          <button class="ghost full" id="smart-scan-button">LEER TARJETA CON IA</button>
+          <small id="smart-scan-status">Si la IA no esta disponible, puedes llenar los datos manualmente.</small>
+          <div class="form-grid">
+            <label>Placa<input id="smart-plate" /></label>
+            <label>Marca<input id="smart-brand" /></label>
+            <label>Modelo / linea<input id="smart-model" /></label>
+            <label>Año<input id="smart-year" inputmode="numeric" /></label>
+            <label class="wide">Numero de serie / VIN<input id="smart-vin" /></label>
+            <label>Color<input id="smart-color" /></label>
+          </div>
+        </article>
+
+        <article class="panel smart-step">
+          <div class="step-title"><span>2</span><h2>Datos del cliente</h2></div>
+          <div class="form-grid">
+            <label>Nombre del cliente<input id="smart-client" /></label>
+            <label>Telefono<input id="smart-phone" inputmode="tel" /></label>
+            <label class="wide">Correo opcional<input id="smart-email" type="email" /></label>
+            <label class="wide">Observaciones del cliente<textarea id="smart-client-notes" rows="3"></textarea></label>
+          </div>
+        </article>
+
+        <article class="panel smart-step">
+          <div class="step-title"><span>3</span><h2>Diagnostico por voz</h2></div>
+          <p class="voice-intro">Graba el diagnostico o escribelo manualmente. Puedes corregir el texto antes de analizarlo.</p>
+          <div class="actions">
+            <button class="primary" id="smart-record-button">GRABAR DIAGNOSTICO</button>
+            <button class="ghost" id="smart-analyze-button">ANALIZAR Y SUGERIR</button>
+          </div>
+          <label>Diagnostico transcrito<textarea id="smart-diagnosis" rows="5"></textarea></label>
+          <div class="ai-panel" id="smart-ai-panel"></div>
+        </article>
+
+        <article class="panel smart-step">
+          <div class="step-title"><span>4</span><h2>Precotizacion editable</h2></div>
+          <div class="status-row smart-status">
+            <button data-smart-status="Borrador">Borrador</button>
+            <button data-smart-status="En revision">En revision</button>
+            <button data-smart-status="Aprobada">Aprobada</button>
+          </div>
+          <div class="row-between">
+            <span>Estado</span><strong id="smart-status-label">Borrador</strong>
+          </div>
+          <div id="smart-lines"></div>
+          <button class="ghost full" id="smart-add-line">AGREGAR CONCEPTO</button>
+          <div class="smart-totals">
+            <div class="row-between"><span>Subtotal</span><strong id="smart-subtotal">$0.00</strong></div>
+            <div class="row-between"><span>IVA 16%</span><strong id="smart-iva">$0.00</strong></div>
+            <div class="row-between total"><span>TOTAL APROX.</span><strong id="smart-total">$0.00</strong></div>
+          </div>
+          <button class="ghost full" id="smart-to-draft">PASAR A COTIZACION EDITABLE</button>
+          <button class="primary full" id="smart-save-review">GUARDAR COMO BORRADOR EN REVISION</button>
+          <small>Esta precotizacion no se envia ni se vuelve final hasta que Leonardo la confirme.</small>
+        </article>
+      </section>
+
       <section class="screen" id="screen-history">
         <header class="page-title">
           <button class="back" data-go="home">VOLVER</button>
@@ -150,6 +225,7 @@
       <nav class="tabbar locked">
         <button data-go="home">INICIO</button>
         <button data-go="quote">VOZ</button>
+        <button data-go="smart">IA</button>
         <button data-go="history">HISTORIAL</button>
         <button data-go="clients">CLIENTES</button>
       </nav>

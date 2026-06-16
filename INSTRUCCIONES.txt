@@ -84,3 +84,22 @@ SUPABASE / RESPALDO EN LA NUBE
 Tambien puedes entrar con:
    Usuario: solis@tallersolis.local
    Contrasena: cotizador
+
+
+TRABAJAR DESDE GITHUB SIN DEPENDER DE LA COMPUTADORA
+
+Se agregaron estos archivos de apoyo:
+
+1. GUIA_GITHUB_SIN_COMPUTADORA.md
+   Explica como editar desde GitHub usando la tecla punto (.).
+
+2. CAMBIOS_PARA_LA_APP.md
+   Sirve para escribir cambios futuros en formato claro.
+
+3. ARCHIVOS_NO_TOCAR.md
+   Lista archivos delicados que no conviene mover sin revisar.
+
+Cuando hagas cambios desde GitHub, espera la palomita verde en Actions.
+
+Luego abre la app con una version nueva, por ejemplo:
+   https://laurasolis130390-png.github.io/taller-solis-cotizador/?v=230

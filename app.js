@@ -13,6 +13,7 @@ const sampleDictation =
 
 let state = loadState();
 let draft = parseVoice(sampleDictation);
+let smartDraft = createSmartDraft();
 let listening = false;
 let currentUser = null;
 let isAuthenticated = false;
@@ -53,6 +54,18 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function createSmartDraft() {
+  return {
+    status: "Borrador",
+    cardImage: "",
+    vehicle: { plate: "", brand: "", model: "", year: "", vin: "", color: "" },
+    client: { name: "", phone: "", email: "", notes: "" },
+    diagnosis: "",
+    aiMessage: "Esperando diagnostico para sugerir trabajos, refacciones y mano de obra.",
+    lines: []
+  };
 }
 
 function biometricSupported() {
@@ -383,6 +396,110 @@ function mergeDraft(previous, incoming, spokenText = "") {
   }
 
   return merged;
+}
+
+function smartVehicleText(source = smartDraft) {
+  return [source.vehicle.brand, source.vehicle.model, source.vehicle.year, source.vehicle.color].filter(Boolean).join(" ").trim();
+}
+
+function smartTotals(source = smartDraft) {
+  const subtotal = source.lines.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0), 0);
+  const iva = subtotal * TAX;
+  return { subtotal, iva, total: subtotal + iva };
+}
+
+function dataUrlFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function normalizeVehicleCard(data = {}) {
+  return {
+    plate: String(data.placa || data.plate || "").toUpperCase(),
+    brand: titleCase(data.marca || data.brand || ""),
+    model: titleCase(data.modelo || data.linea || data.model || data.line || ""),
+    year: String(data.anio || data.año || data.year || "").replace(/\D/g, "").slice(0, 4),
+    vin: String(data.serie || data.vin || data.numero_serie || "").toUpperCase(),
+    color: titleCase(data.color || "")
+  };
+}
+
+async function analyzeVehicleCard(imageData) {
+  if (!SUPABASE_READY || !supabase || !imageData) return {};
+  try {
+    const { data, error } = await supabase.functions.invoke("vehicle-card", { body: { image: imageData } });
+    if (error) throw error;
+    return normalizeVehicleCard(data);
+  } catch (error) {
+    console.warn("OCR de tarjeta no disponible", error.message);
+    return {};
+  }
+}
+
+function fallbackSmartLines(text) {
+  const parsed = parseVoice(text);
+  if (parsed.concepts?.length) {
+    return parsed.concepts.map((item) => ({
+      id: `sl-${Date.now()}-${Math.random()}`,
+      concept: item.description || parsed.work || "Servicio mecanico sugerido",
+      type: /mano de obra/i.test(item.description) ? "mano de obra" : "servicio",
+      quantity: item.quantity || 1,
+      price: item.price || 0
+    }));
+  }
+  return [
+    { id: `sl-${Date.now()}-1`, concept: parsed.work || "Revision y diagnostico", type: "servicio", quantity: 1, price: 0 }
+  ];
+}
+
+async function analyzeSmartDiagnosis(text) {
+  const parsed = await parseWithAssistant(text);
+  const lines = parsed.concepts?.length
+    ? parsed.concepts.map((item) => ({
+        id: `sl-${Date.now()}-${Math.random()}`,
+        concept: item.description || parsed.work || "Servicio mecanico sugerido",
+        type: /mano de obra/i.test(item.description) ? "mano de obra" : "servicio",
+        quantity: item.quantity || 1,
+        price: item.price || 0
+      }))
+    : fallbackSmartLines(text);
+
+  return {
+    lines,
+    aiMessage: missingData(parsed).length
+      ? `Sugerencia generada con datos incompletos. Revisa: ${missingData(parsed).join(", ")}.`
+      : "Sugerencia lista. Revisa conceptos, cantidades y precios antes de aprobar."
+  };
+}
+
+function smartToQuoteDraft() {
+  const vehicle = smartVehicleText() || "Vehiculo pendiente";
+  return {
+    clientName: smartDraft.client.name,
+    clientPhone: smartDraft.client.phone,
+    vehicle,
+    brand: smartDraft.vehicle.brand,
+    model: smartDraft.vehicle.model,
+    year: smartDraft.vehicle.year,
+    plates: smartDraft.vehicle.plate,
+    diagnosis: smartDraft.diagnosis,
+    technical: technicalText(smartDraft.diagnosis),
+    work: smartDraft.lines[0]?.concept || "Servicio mecanico sugerido",
+    parts: smartDraft.lines.filter((item) => item.type === "refaccion").map((item) => item.concept).join(", "),
+    observations: [smartDraft.client.notes, `Modulo: Cotizacion inteligente. Estado: ${smartDraft.status}. VIN: ${smartDraft.vehicle.vin || "Pendiente"}`]
+      .filter(Boolean)
+      .join("\n"),
+    concepts: smartDraft.lines.map((item) => ({
+      id: item.id,
+      description: `${item.concept}${item.type ? ` (${item.type})` : ""}`,
+      quantity: Number(item.quantity || 0),
+      price: Number(item.price || 0)
+    }))
+  };
 }
 
 function money(value) {
@@ -769,12 +886,100 @@ function renderClients() {
     .join("");
 }
 
+function bindSmartDraft() {
+  const vehicleFields = {
+    "smart-plate": "plate",
+    "smart-brand": "brand",
+    "smart-model": "model",
+    "smart-year": "year",
+    "smart-vin": "vin",
+    "smart-color": "color"
+  };
+  Object.entries(vehicleFields).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = smartDraft.vehicle[key] || "";
+    el.oninput = () => {
+      smartDraft.vehicle[key] = el.value;
+    };
+  });
+
+  const clientFields = {
+    "smart-client": "name",
+    "smart-phone": "phone",
+    "smart-email": "email",
+    "smart-client-notes": "notes"
+  };
+  Object.entries(clientFields).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = smartDraft.client[key] || "";
+    el.oninput = () => {
+      smartDraft.client[key] = el.value;
+    };
+  });
+
+  const diagnosis = document.getElementById("smart-diagnosis");
+  if (diagnosis) {
+    diagnosis.value = smartDraft.diagnosis || "";
+    diagnosis.oninput = () => {
+      smartDraft.diagnosis = diagnosis.value;
+    };
+  }
+}
+
+function renderSmartLines() {
+  const list = document.getElementById("smart-lines");
+  if (!list) return;
+  list.innerHTML =
+    smartDraft.lines
+      .map(
+        (line, index) => `
+      <div class="smart-line">
+        <label>Concepto<input data-smart-line="${index}" data-smart-field="concept" value="${escapeHtml(line.concept)}" /></label>
+        <label>Tipo<select data-smart-line="${index}" data-smart-field="type">
+          ${["refaccion", "mano de obra", "servicio"].map((type) => `<option value="${type}" ${line.type === type ? "selected" : ""}>${type}</option>`).join("")}
+        </select></label>
+        <label>Cantidad<input data-smart-line="${index}" data-smart-field="quantity" inputmode="decimal" value="${line.quantity}" /></label>
+        <label>Precio unitario<input data-smart-line="${index}" data-smart-field="price" inputmode="decimal" value="${line.price}" /></label>
+        <div class="wide row-between"><span>Importe</span><strong>${money(Number(line.quantity || 0) * Number(line.price || 0))}</strong></div>
+        <button class="danger wide" data-smart-delete="${index}">QUITAR</button>
+      </div>`
+      )
+      .join("") || `<article class="ai-panel"><strong>Sin conceptos</strong><p>Graba o escribe el diagnostico y toca ANALIZAR Y SUGERIR.</p></article>`;
+}
+
+function renderSmartTotalsOnly() {
+  const smartQuoteTotals = smartTotals();
+  document.getElementById("smart-subtotal").textContent = money(smartQuoteTotals.subtotal);
+  document.getElementById("smart-iva").textContent = money(smartQuoteTotals.iva);
+  document.getElementById("smart-total").textContent = money(smartQuoteTotals.total);
+}
+
+function renderSmart() {
+  bindSmartDraft();
+  renderSmartLines();
+  const preview = document.getElementById("smart-card-preview");
+  if (preview) {
+    preview.src = smartDraft.cardImage || "";
+    preview.classList.toggle("ready", Boolean(smartDraft.cardImage));
+  }
+  const panel = document.getElementById("smart-ai-panel");
+  if (panel) {
+    panel.innerHTML = `<strong>Asistente IA</strong><p>${escapeHtml(smartDraft.aiMessage)}</p>`;
+  }
+  document.getElementById("smart-status-label").textContent = smartDraft.status;
+  document.querySelectorAll("[data-smart-status]").forEach((button) => button.classList.toggle("active", button.dataset.smartStatus === smartDraft.status));
+  renderSmartTotalsOnly();
+}
+
 function render() {
   renderHome();
   bindDraft();
   renderConcepts();
   renderQuote();
   renderAiPanel();
+  renderSmart();
   renderHistory();
   renderClients();
 }
@@ -1098,6 +1303,119 @@ function setup() {
   document.getElementById("add-concept").addEventListener("click", () => {
     draft.concepts.push({ id: `c-${Date.now()}`, description: "Nuevo concepto", quantity: 1, price: 0 });
     render();
+  });
+  document.getElementById("smart-card-photo").addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    smartDraft.cardImage = await dataUrlFromFile(file);
+    smartDraft.aiMessage = "Foto cargada. Toca LEER TARJETA CON IA o captura los datos manualmente.";
+    renderSmart();
+  });
+  document.getElementById("smart-scan-button").addEventListener("click", async () => {
+    const button = document.getElementById("smart-scan-button");
+    const status = document.getElementById("smart-scan-status");
+    const original = button.textContent;
+    if (!smartDraft.cardImage) {
+      status.textContent = "Primero toma o sube una foto de la tarjeta.";
+      return;
+    }
+    try {
+      button.textContent = "LEYENDO TARJETA...";
+      status.textContent = "Analizando imagen. Revisa y corrige cualquier dato sugerido.";
+      const vehicle = await analyzeVehicleCard(smartDraft.cardImage);
+      smartDraft.vehicle = { ...smartDraft.vehicle, ...Object.fromEntries(Object.entries(vehicle).filter(([, value]) => value)) };
+      smartDraft.aiMessage = Object.values(vehicle).some(Boolean)
+        ? "Datos de vehiculo sugeridos. Revisa placa, VIN, marca, modelo y ano antes de continuar."
+        : "No pude extraer datos automaticamente. Puedes capturarlos manualmente.";
+    } finally {
+      button.textContent = original;
+      renderSmart();
+    }
+  });
+  document.getElementById("smart-record-button").addEventListener("click", () => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      smartDraft.aiMessage = "Este navegador no permite dictado. Escribe el diagnostico manualmente.";
+      renderSmart();
+      return;
+    }
+    const recognition = new Recognition();
+    recognition.lang = "es-MX";
+    recognition.onresult = (event) => {
+      const spokenText = event.results[0][0].transcript;
+      smartDraft.diagnosis = smartDraft.diagnosis.trim() ? `${smartDraft.diagnosis.trim()}\n${spokenText}` : spokenText;
+      smartDraft.aiMessage = "Diagnostico capturado. Revisa el texto y toca ANALIZAR Y SUGERIR.";
+      renderSmart();
+    };
+    recognition.start();
+  });
+  document.getElementById("smart-analyze-button").addEventListener("click", async () => {
+    smartDraft.diagnosis = document.getElementById("smart-diagnosis").value;
+    if (!smartDraft.diagnosis.trim()) {
+      smartDraft.aiMessage = "Primero graba o escribe el diagnostico.";
+      renderSmart();
+      return;
+    }
+    const button = document.getElementById("smart-analyze-button");
+    const original = button.textContent;
+    try {
+      button.textContent = "ANALIZANDO...";
+      const result = await analyzeSmartDiagnosis(smartDraft.diagnosis);
+      smartDraft.lines = result.lines;
+      smartDraft.aiMessage = result.aiMessage;
+      smartDraft.status = "En revision";
+      speak("Leonardo, ya prepare una precotizacion editable. Revisa los conceptos, cantidades y precios antes de aprobar.");
+    } finally {
+      button.textContent = original;
+      renderSmart();
+    }
+  });
+  document.getElementById("smart-lines").addEventListener("input", (event) => {
+    const index = Number(event.target.dataset.smartLine);
+    const field = event.target.dataset.smartField;
+    if (Number.isNaN(index) || !field) return;
+    smartDraft.lines[index][field] = ["quantity", "price"].includes(field) ? amountFrom(event.target.value) : event.target.value;
+    const line = smartDraft.lines[index];
+    const importEl = event.target.closest(".smart-line")?.querySelector(".row-between strong");
+    if (importEl) importEl.textContent = money(Number(line.quantity || 0) * Number(line.price || 0));
+    renderSmartTotalsOnly();
+  });
+  document.getElementById("smart-lines").addEventListener("change", (event) => {
+    const index = Number(event.target.dataset.smartLine);
+    const field = event.target.dataset.smartField;
+    if (Number.isNaN(index) || !field) return;
+    smartDraft.lines[index][field] = event.target.value;
+    renderSmart();
+  });
+  document.getElementById("smart-lines").addEventListener("click", (event) => {
+    const index = Number(event.target.dataset.smartDelete);
+    if (Number.isNaN(index)) return;
+    smartDraft.lines.splice(index, 1);
+    renderSmart();
+  });
+  document.getElementById("smart-add-line").addEventListener("click", () => {
+    smartDraft.lines.push({ id: `sl-${Date.now()}`, concept: "Nuevo concepto", type: "servicio", quantity: 1, price: 0 });
+    renderSmart();
+  });
+  document.querySelectorAll("[data-smart-status]").forEach((button) =>
+    button.addEventListener("click", () => {
+      smartDraft.status = button.dataset.smartStatus;
+      renderSmart();
+    })
+  );
+  document.getElementById("smart-to-draft").addEventListener("click", () => {
+    draft = smartToQuoteDraft();
+    document.getElementById("dictation").value = smartDraft.diagnosis;
+    go("quote");
+  });
+  document.getElementById("smart-save-review").addEventListener("click", () => {
+    if (!confirm("Guardar esta precotizacion como borrador en revision? No se enviara al cliente.")) return;
+    draft = smartToQuoteDraft();
+    const quote = saveQuote("Borrador");
+    if (quote) {
+      quote.status = smartDraft.status === "Aprobada" ? "Aceptada" : "Borrador";
+      syncCloudState();
+    }
   });
   document.getElementById("concept-list").addEventListener("input", (event) => {
     const index = Number(event.target.dataset.concept);
