@@ -142,8 +142,8 @@
             <small>La IA solo sugiere datos. Siempre revisa antes de continuar.</small>
           </label>
           <img id="smart-card-preview" class="smart-preview" alt="Vista previa de tarjeta" />
-          <button class="ghost full" id="smart-scan-button">LEER TARJETA CON IA</button>
-          <small id="smart-scan-status">Si la IA no esta disponible, puedes llenar los datos manualmente.</small>
+          <button class="ghost full" id="smart-scan-button">LEER TARJETA GRATIS</button>
+          <small id="smart-scan-status">Usa OCR gratis en el celular. Si la foto no se lee bien, puedes llenar manualmente.</small>
           <div class="form-grid">
             <label>Placa<input id="smart-plate" /></label>
             <label>Marca<input id="smart-brand" /></label>
@@ -230,6 +230,7 @@
         <button data-go="clients">CLIENTES</button>
       </nav>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

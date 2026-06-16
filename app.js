@@ -450,18 +450,75 @@ function normalizeVehicleCard(data = {}) {
   };
 }
 
-async function analyzeVehicleCard(imageData) {
-  if (!SUPABASE_READY || !supabase || !imageData) {
-    return { __error: "Supabase no esta conectado en esta version de la app." };
+function cleanOcrText(text) {
+  return plain(String(text || ""))
+    .replace(/[|_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchAfterLabel(text, labels, pattern = "[A-Z0-9 -]{3,35}") {
+  for (const label of labels) {
+    const regex = new RegExp(`${label}\\s*[:#-]?\\s*(${pattern})`, "i");
+    const match = text.match(regex);
+    if (match?.[1]) return match[1].trim();
+  }
+  return "";
+}
+
+function parseVehicleCardText(rawText) {
+  const text = cleanOcrText(rawText).toUpperCase();
+  const brands = ["NISSAN", "CHEVROLET", "FORD", "TOYOTA", "VOLKSWAGEN", "VW", "HONDA", "MAZDA", "KIA", "HYUNDAI", "DODGE", "RENAULT", "SEAT", "FIAT", "MITSUBISHI"];
+  const colors = ["BLANCO", "NEGRO", "GRIS", "PLATA", "ROJO", "AZUL", "VERDE", "AMARILLO", "CAFE", "BEIGE", "DORADO", "NARANJA"];
+  const vin =
+    matchAfterLabel(text, ["NIV", "VIN", "SERIE", "NUMERO DE SERIE", "NO DE SERIE"], "[A-HJ-NPR-Z0-9]{11,17}") ||
+    text.match(/\b[A-HJ-NPR-Z0-9]{17}\b/)?.[0] ||
+    "";
+  const year =
+    matchAfterLabel(text, ["ANO", "ANIO", "AÑO", "MODELO"], "(?:19|20)\\d{2}") ||
+    text.match(/\b(?:19|20)\d{2}\b/)?.[0] ||
+    "";
+  const plate =
+    matchAfterLabel(text, ["PLACA", "PLACAS", "NUMERO DE PLACA"], "[A-Z0-9-]{5,10}") ||
+    text.match(/\b[A-Z]{2,3}[- ]?\d{2,4}[- ]?[A-Z0-9]{0,3}\b/)?.[0]?.replace(/\s/g, "") ||
+    "";
+  const brand =
+    titleCase(matchAfterLabel(text, ["MARCA"], "[A-Z ]{3,20}") || brands.find((item) => text.includes(item)) || "");
+  const model =
+    titleCase(matchAfterLabel(text, ["LINEA", "SUBMARCA", "MODELO", "VERSION"], "[A-Z0-9 ]{3,30}").replace(/\b(USO|CLASE|TIPO|COLOR|MARCA)\b.*$/i, ""));
+  const color = titleCase(matchAfterLabel(text, ["COLOR"], "[A-Z ]{3,18}") || colors.find((item) => text.includes(item)) || "");
+
+  return normalizeVehicleCard({ placa: plate, marca: brand, modelo: model, anio: year, vin, color });
+}
+
+async function analyzeVehicleCardLocal(imageData, onProgress = () => undefined) {
+  if (!window.Tesseract?.recognize) {
+    return { __error: "El lector OCR gratis no cargo. Revisa internet y vuelve a intentar." };
   }
   try {
-    const { data, error } = await supabase.functions.invoke("smooth-endpoint", { body: { image: imageData } });
-    if (error) throw error;
-    return normalizeVehicleCard(data);
+    const result = await window.Tesseract.recognize(imageData, "spa+eng", {
+      logger: (event) => {
+        if (event.status) onProgress(event);
+      }
+    });
+    const vehicle = parseVehicleCardText(result?.data?.text || "");
+    return {
+      ...vehicle,
+      __rawText: result?.data?.text || ""
+    };
   } catch (error) {
-    console.warn("OCR de tarjeta no disponible", error.message);
-    return { __error: error.message || "No se pudo leer la tarjeta con IA." };
+    return { __error: error.message || "No se pudo leer la imagen con OCR local." };
   }
+}
+
+async function analyzeVehicleCard(imageData) {
+  if (!imageData) return { __error: "Falta la imagen de la tarjeta." };
+  return analyzeVehicleCardLocal(imageData, (event) => {
+    const status = document.getElementById("smart-scan-status");
+    if (!status) return;
+    const percent = event.progress ? ` ${Math.round(event.progress * 100)}%` : "";
+    status.textContent = `OCR gratis leyendo tarjeta: ${event.status}${percent}`;
+  });
 }
 
 function fallbackSmartLines(text) {
@@ -1332,7 +1389,7 @@ function setup() {
     const file = event.target.files?.[0];
     if (!file) return;
     smartDraft.cardImage = await dataUrlFromFile(file);
-    smartDraft.aiMessage = "Foto cargada. Toca LEER TARJETA CON IA o captura los datos manualmente.";
+    smartDraft.aiMessage = "Foto cargada. Toca LEER TARJETA GRATIS o captura los datos manualmente.";
     renderSmart();
   });
   document.getElementById("smart-scan-button").addEventListener("click", async () => {
@@ -1345,19 +1402,19 @@ function setup() {
     }
     try {
       button.textContent = "LEYENDO TARJETA...";
-      status.textContent = "Analizando imagen. Revisa y corrige cualquier dato sugerido.";
+      status.textContent = "Leyendo imagen con OCR gratis. Revisa y corrige cualquier dato sugerido.";
       const vehicle = await analyzeVehicleCard(smartDraft.cardImage);
       if (vehicle.__error) {
-        status.textContent = "No se pudo leer con IA. Puedes llenar los datos manualmente.";
-        smartDraft.aiMessage = `OCR/IA no disponible: ${vehicle.__error}. Revisa la funcion smooth-endpoint en Supabase.`;
+        status.textContent = "No se pudo leer automaticamente. Puedes llenar los datos manualmente.";
+        smartDraft.aiMessage = `OCR gratis no disponible: ${vehicle.__error}`;
         return;
       }
       const cleanVehicle = Object.fromEntries(Object.entries(vehicle).filter(([key, value]) => key !== "__error" && value));
       smartDraft.vehicle = { ...smartDraft.vehicle, ...cleanVehicle };
       status.textContent = Object.values(cleanVehicle).some(Boolean) ? "Lectura terminada. Revisa los datos sugeridos." : "No encontre datos claros. Intenta otra foto mas derecha y con luz.";
       smartDraft.aiMessage = Object.values(cleanVehicle).some(Boolean)
-        ? "Datos de vehiculo sugeridos. Revisa placa, VIN, marca, modelo y ano antes de continuar."
-        : "No pude extraer datos automaticamente. Puedes capturarlos manualmente.";
+        ? "Datos de vehiculo sugeridos por OCR gratis. Revisa placa, VIN, marca, modelo y ano antes de continuar."
+        : "No encontre datos claros. Intenta otra foto con buena luz o capturalos manualmente.";
     } finally {
       button.textContent = original;
       renderSmart();
