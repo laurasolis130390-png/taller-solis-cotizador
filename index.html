@@ -17,15 +17,10 @@
       <section class="screen active" id="screen-login">
         <div class="brand login-hero">
           <img class="brand-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
-          <span>A TU SERVICIO, SIEMPRE.</span>
-          <div class="fingerprint-mark">⌾</div>
-          <p>Acceso con huella</p>
+          <span>A TUS ORDENES</span>
+          <strong>SERVICIO SOLIS</strong>
+          <b>COTIZADOR</b>
         </div>
-        <article class="assistant-welcome login-assistant">
-          <strong>Hola Leonardo</strong>
-          <p>Soy tu asistente virtual. Puedo darte la bienvenida por voz, dejar musica de fondo y ayudarte a ordenar cotizaciones.</p>
-        </article>
-        <button class="sound-toggle" id="sound-button" type="button">TOCA AQUI: ACTIVAR VOZ Y MUSICA</button>
         <article class="panel">
           <h1>Inicio de sesion</h1>
           <p>Acceso rapido para crear cotizaciones del taller.</p>
@@ -57,10 +52,6 @@
             <small>Cotizaciones activas</small>
           </div>
           <div class="car-silhouette">AUTO</div>
-        </article>
-        <article class="assistant-welcome">
-          <strong>Hola Leonardo</strong>
-          <p>Estoy listo para ayudarte. Cuentame el caso del cliente y yo acomodo la cotizacion.</p>
         </article>
         <div class="home-menu">
           <button class="primary full menu-button" data-go="smart"><span>+</span>NUEVA COTIZACION</button>
@@ -94,7 +85,7 @@
         <article class="mic-card">
           <div class="mic" id="mic-status">MIC</div>
           <h2 id="listen-label">Dictado por voz</h2>
-          <p class="voice-intro">Hola Leonardo, dime que necesita el cliente, que vehiculo trae y cuanto cuesta el trabajo.</p>
+          <p class="voice-intro">Dime que necesita el cliente, que vehiculo trae y cuanto cuesta el trabajo.</p>
           <label>Texto dictado<textarea id="dictation" rows="5"></textarea></label>
           <div class="actions">
             <button class="primary" id="listen-button">GRABAR</button>
@@ -150,12 +141,26 @@
         <article class="panel smart-step">
           <div class="step-title"><span>1</span><h2>Tarjeta de circulacion</h2></div>
           <p class="scan-instruction">Coloque la tarjeta dentro del recuadro</p>
-          <label class="scanner-frame">
-            <input id="smart-card-photo" type="file" accept="image/*" capture="environment" />
+          <button class="scanner-frame" id="smart-open-camera" type="button">
             <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-            <strong>TOMAR FOTO</strong>
+            <strong>ABRIR CAMARA CON MARCO</strong>
             <small>Centra la tarjeta. Se ignora lo que quede fuera del marco.</small>
-          </label>
+          </button>
+          <input id="smart-card-photo" class="hidden-input" type="file" accept="image/*" capture="environment" />
+          <div class="camera-panel" id="smart-camera-panel">
+            <div class="camera-view">
+              <video id="smart-camera-video" autoplay playsinline muted></video>
+              <div class="camera-mask"></div>
+              <div class="camera-guide">
+                <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="primary full" id="smart-capture-button" type="button">CAPTURAR TARJETA</button>
+              <button class="ghost full" id="smart-close-camera" type="button">CANCELAR</button>
+            </div>
+            <canvas id="smart-camera-canvas"></canvas>
+          </div>
           <img id="smart-card-preview" class="smart-preview" alt="Vista previa de tarjeta" />
           <button class="ghost full" id="smart-retake-button" type="button">VOLVER A TOMAR FOTO</button>
           <button class="primary full" id="smart-scan-button">LEER TARJETA CON IA</button>
@@ -178,8 +183,6 @@
           <div class="form-grid">
             <label>Nombre del cliente<input id="smart-client" /></label>
             <label>WhatsApp<input id="smart-phone" inputmode="tel" /></label>
-            <label class="wide">Correo opcional<input id="smart-email" type="email" /></label>
-            <label class="wide">Observaciones del cliente<textarea id="smart-client-notes" rows="3"></textarea></label>
           </div>
         </article>
 

@@ -30,6 +30,7 @@ let soundEnabled = (() => {
 let audioContext = null;
 let musicTimer = null;
 let welcomeSpoken = false;
+let smartCameraStream = null;
 
 function starterState() {
   const quote = {
@@ -1325,6 +1326,65 @@ async function sharePdf(source = draft, folio = nextFolio()) {
   window.open(`https://wa.me/?text=${text}`, "_blank");
 }
 
+async function openSmartCamera() {
+  const status = document.getElementById("smart-scan-status");
+  const panel = document.getElementById("smart-camera-panel");
+  const video = document.getElementById("smart-camera-video");
+  if (!navigator.mediaDevices?.getUserMedia) {
+    status.textContent = "Este navegador no permite camara con marco. Se abrira la camara normal.";
+    document.getElementById("smart-card-photo").click();
+    return;
+  }
+  try {
+    smartCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = smartCameraStream;
+    panel.classList.add("active");
+    status.textContent = "Coloque la tarjeta dentro del recuadro y toque CAPTURAR TARJETA.";
+  } catch (error) {
+    status.textContent = "No pude abrir la camara con marco. Revisa permisos o usa la camara normal.";
+    document.getElementById("smart-card-photo").click();
+  }
+}
+
+function closeSmartCamera() {
+  const panel = document.getElementById("smart-camera-panel");
+  const video = document.getElementById("smart-camera-video");
+  smartCameraStream?.getTracks().forEach((track) => track.stop());
+  smartCameraStream = null;
+  if (video) video.srcObject = null;
+  panel?.classList.remove("active");
+}
+
+async function captureSmartCard() {
+  const video = document.getElementById("smart-camera-video");
+  const canvas = document.getElementById("smart-camera-canvas");
+  const status = document.getElementById("smart-scan-status");
+  if (!video?.videoWidth || !video?.videoHeight) {
+    status.textContent = "La camara aun no esta lista. Espera un segundo y vuelve a capturar.";
+    return;
+  }
+
+  const sourceWidth = video.videoWidth;
+  const sourceHeight = video.videoHeight;
+  const cropWidth = sourceWidth * 0.86;
+  const cropHeight = cropWidth / 1.65;
+  const cropX = sourceWidth * 0.07;
+  const cropY = Math.max(0, sourceHeight * 0.19);
+  const safeHeight = Math.min(cropHeight, sourceHeight - cropY);
+  canvas.width = 1200;
+  canvas.height = Math.round((safeHeight / cropWidth) * canvas.width);
+  const context = canvas.getContext("2d");
+  context.drawImage(video, cropX, cropY, cropWidth, safeHeight, 0, 0, canvas.width, canvas.height);
+  smartDraft.cardImage = canvas.toDataURL("image/jpeg", 0.82);
+  smartDraft.aiMessage = "Foto capturada dentro del marco. Toca LEER TARJETA CON IA.";
+  status.textContent = "Vista previa lista. Revisa que la tarjeta se vea completa antes de leerla.";
+  closeSmartCamera();
+  renderSmart();
+}
+
 function escapeHtml(value) {
   return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
@@ -1469,10 +1529,11 @@ function setup() {
     smartDraft.aiMessage = "Foto cargada. Toca LEER TARJETA CON IA o captura los datos manualmente.";
     renderSmart();
   });
+  document.getElementById("smart-open-camera")?.addEventListener("click", openSmartCamera);
+  document.getElementById("smart-close-camera")?.addEventListener("click", closeSmartCamera);
+  document.getElementById("smart-capture-button")?.addEventListener("click", captureSmartCard);
   document.getElementById("smart-retake-button")?.addEventListener("click", () => {
-    const input = document.getElementById("smart-card-photo");
-    input.value = "";
-    input.click();
+    openSmartCamera();
   });
   document.getElementById("smart-scan-button").addEventListener("click", async () => {
     const button = document.getElementById("smart-scan-button");
