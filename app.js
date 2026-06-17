@@ -6,6 +6,7 @@ const STORAGE_KEY = "taller-solis-web";
 const BIOMETRIC_KEY = "taller-solis-biometric";
 const SOUND_KEY = "taller-solis-sound";
 const TAX = 0.16;
+const AI_USAGE_START = 2;
 const QUOTE_STATUSES = ["Pendiente", "Enviada", "Aprobada", "En reparación", "Lista", "Facturada", "Cancelada"];
 const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const supabase = SUPABASE_READY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -36,7 +37,7 @@ function starterState() {
   return {
     quotes: [],
     clients: [],
-    aiUsage: { total: 0, cardReads: 0, quoteReads: 0 }
+    aiUsage: { total: AI_USAGE_START, cardReads: AI_USAGE_START, quoteReads: 0, seededFromOpenAiDashboard: true }
   };
 }
 
@@ -56,6 +57,11 @@ function normalizeState(saved) {
   clean.aiUsage.total = Number(clean.aiUsage.total || 0);
   clean.aiUsage.cardReads = Number(clean.aiUsage.cardReads || 0);
   clean.aiUsage.quoteReads = Number(clean.aiUsage.quoteReads || 0);
+  if (!clean.aiUsage.seededFromOpenAiDashboard && clean.aiUsage.total < AI_USAGE_START) {
+    clean.aiUsage.total = AI_USAGE_START;
+    clean.aiUsage.cardReads = Math.max(clean.aiUsage.cardReads, AI_USAGE_START);
+    clean.aiUsage.seededFromOpenAiDashboard = true;
+  }
   return clean;
 }
 
