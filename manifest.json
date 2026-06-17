@@ -1,7 +1,7 @@
 {
-  "name": "Taller Solis Cotizador",
-  "short_name": "Taller Solis",
-  "description": "Cotizador profesional para taller mecanico con historial, folio y WhatsApp.",
+  "name": "Servicio Solis Cotizador",
+  "short_name": "Servicio Solis",
+  "description": "Cotizador profesional cloud-first para taller mecanico con historial, folio y WhatsApp.",
   "id": "https://laurasolis130390-png.github.io/taller-solis-cotizador/",
   "start_url": "https://laurasolis130390-png.github.io/taller-solis-cotizador/index.html",
   "scope": "https://laurasolis130390-png.github.io/taller-solis-cotizador/",

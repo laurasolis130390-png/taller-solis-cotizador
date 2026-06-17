@@ -6,6 +6,7 @@ const STORAGE_KEY = "taller-solis-web";
 const BIOMETRIC_KEY = "taller-solis-biometric";
 const SOUND_KEY = "taller-solis-sound";
 const TAX = 0.16;
+const QUOTE_STATUSES = ["Pendiente", "Enviada", "Aprobada", "En reparación", "Lista", "Facturada", "Cancelada"];
 const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const supabase = SUPABASE_READY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const sampleDictation =
@@ -60,11 +61,12 @@ function createSmartDraft() {
   return {
     status: "Borrador",
     cardImage: "",
-    vehicle: { plate: "", brand: "", model: "", year: "", vin: "", color: "" },
+    vehicle: { plate: "", brand: "", model: "", year: "", vin: "", color: "", state: "", mileage: "" },
     client: { name: "", phone: "", email: "", notes: "" },
     diagnosis: "",
     aiMessage: "Esperando diagnostico para sugerir trabajos, refacciones y mano de obra.",
-    lines: []
+    lines: [],
+    taxIncluded: false
   };
 }
 
@@ -408,10 +410,27 @@ function smartVehicleText(source = smartDraft) {
   return [source.vehicle.brand, source.vehicle.model, source.vehicle.year, source.vehicle.color].filter(Boolean).join(" ").trim();
 }
 
+function vehicleHistoryFor(vehicle = smartDraft.vehicle) {
+  const plate = plain(vehicle.plate || "").toLowerCase();
+  const vin = plain(vehicle.vin || "").toLowerCase();
+  if (!plate && !vin) return [];
+  return state.quotes
+    .filter((quote) => {
+      const haystack = plain(`${quote.plates || ""} ${quote.vehicle || ""} ${quote.observations || ""}`).toLowerCase();
+      return (plate && haystack.includes(plate)) || (vin && haystack.includes(vin));
+    })
+    .filter((quote) => !quote.deletedAt);
+}
+
 function smartTotals(source = smartDraft) {
-  const subtotal = source.lines.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0), 0);
-  const iva = subtotal * TAX;
-  return { subtotal, iva, total: subtotal + iva };
+  const raw = source.lines.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0), 0);
+  if (source.taxIncluded) {
+    const subtotal = raw / (1 + TAX);
+    const iva = raw - subtotal;
+    return { subtotal, iva, total: raw };
+  }
+  const iva = raw * TAX;
+  return { subtotal: raw, iva, total: raw + iva };
 }
 
 function readFileAsDataUrl(file) {
@@ -452,7 +471,8 @@ function normalizeVehicleCard(data = {}) {
     model: titleCase(data.modelo || data.linea || data.model || data.line || ""),
     year: String(data.anio || data.año || data.year || "").replace(/\D/g, "").slice(0, 4),
     vin: String(data.serie || data.vin || data.numero_serie || "").toUpperCase(),
-    color: titleCase(data.color || "")
+    color: titleCase(data.color || ""),
+    state: titleCase(data.entidad || data.estado || data.state || "")
   };
 }
 
@@ -519,11 +539,21 @@ async function analyzeVehicleCardLocal(imageData, onProgress = () => undefined) 
 
 async function analyzeVehicleCard(imageData) {
   if (!imageData) return { __error: "Falta la imagen de la tarjeta." };
+  if (SUPABASE_READY && supabase) {
+    try {
+      const { data, error } = await supabase.functions.invoke("vehicle-card", { body: { image: imageData } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return normalizeVehicleCard(data);
+    } catch (error) {
+      console.warn("IA de tarjeta no disponible, usando lectura local", error.message);
+    }
+  }
   return analyzeVehicleCardLocal(imageData, (event) => {
     const status = document.getElementById("smart-scan-status");
     if (!status) return;
     const percent = event.progress ? ` ${Math.round(event.progress * 100)}%` : "";
-    status.textContent = `OCR gratis leyendo tarjeta: ${event.status}${percent}`;
+    status.textContent = `Lectura de respaldo: ${event.status}${percent}`;
   });
 }
 
@@ -577,7 +607,10 @@ function smartToQuoteDraft() {
     technical: technicalText(smartDraft.diagnosis),
     work: smartDraft.lines[0]?.concept || "Servicio mecanico sugerido",
     parts: smartDraft.lines.filter((item) => item.type === "refaccion").map((item) => item.concept).join(", "),
-    observations: [smartDraft.client.notes, `Modulo: Cotizacion inteligente. Estado: ${smartDraft.status}. VIN: ${smartDraft.vehicle.vin || "Pendiente"}`]
+    observations: [
+      smartDraft.client.notes,
+      `Modulo: Cotizacion inteligente. Estado: ${smartDraft.status}. VIN: ${smartDraft.vehicle.vin || "Pendiente"}. Kilometraje: ${smartDraft.vehicle.mileage || "Pendiente"}. Entidad: ${smartDraft.vehicle.state || "Pendiente"}.`
+    ]
       .filter(Boolean)
       .join("\n"),
     concepts: smartDraft.lines.map((item) => ({
@@ -895,9 +928,11 @@ function renderHome() {
     return !quote.deletedAt && date.getMonth() === month && date.getFullYear() === year;
   });
   document.getElementById("metric-count").textContent = monthQuotes.length;
+  const activeDashboard = document.getElementById("dashboard-active");
+  if (activeDashboard) activeDashboard.textContent = monthQuotes.filter((quote) => ["Pendiente", "Enviada", "Aprobada", "En reparación"].includes(quote.status)).length;
   document.getElementById("metric-total").textContent = money(monthQuotes.reduce((sum, quote) => sum + totals(quote).total, 0));
-  document.getElementById("metric-accepted").textContent = monthQuotes.filter((quote) => ["Aceptada", "Pagada"].includes(quote.status)).length;
-  document.getElementById("metric-pending").textContent = monthQuotes.filter((quote) => ["Borrador", "Enviada"].includes(quote.status)).length;
+  document.getElementById("metric-accepted").textContent = monthQuotes.filter((quote) => ["Aprobada", "Aceptada", "Facturada", "Pagada"].includes(quote.status)).length;
+  document.getElementById("metric-pending").textContent = monthQuotes.filter((quote) => ["Pendiente", "Borrador", "Enviada"].includes(quote.status)).length;
 }
 
 function renderConcepts() {
@@ -946,11 +981,11 @@ function renderHistory() {
       <article class="panel quote-row ${quote.deletedAt ? "deleted" : ""}">
         <div class="row-between">
           <div><h2>${quote.folio}</h2><p>${escapeHtml(quote.clientName)} - ${escapeHtml(quote.vehicle)}</p></div>
-          <strong>${quote.deletedAt ? "Papelera" : quote.status}</strong>
+          <strong class="status-pill ${plain(quote.status).toLowerCase().replace(/\s+/g, "-")}">${quote.deletedAt ? "Papelera" : quote.status}</strong>
         </div>
         <b class="quote-total">${money(totals(quote).total)}</b>
         <div class="status-row">
-          ${["Borrador", "Enviada", "Aceptada", "Rechazada", "Pagada"].map((status) => `<button data-status="${status}" data-id="${quote.id}">${status}</button>`).join("")}
+          ${QUOTE_STATUSES.map((status) => `<button data-status="${status}" data-id="${quote.id}">${status}</button>`).join("")}
         </div>
         <div class="actions">
           <button class="ghost" data-edit="${quote.id}">EDITAR</button>
@@ -980,7 +1015,9 @@ function bindSmartDraft() {
     "smart-model": "model",
     "smart-year": "year",
     "smart-vin": "vin",
-    "smart-color": "color"
+    "smart-color": "color",
+    "smart-state": "state",
+    "smart-mileage": "mileage"
   };
   Object.entries(vehicleFields).forEach(([id, key]) => {
     const el = document.getElementById(id);
@@ -988,6 +1025,7 @@ function bindSmartDraft() {
     el.value = smartDraft.vehicle[key] || "";
     el.oninput = () => {
       smartDraft.vehicle[key] = el.value;
+      renderVehicleHistory();
     };
   });
 
@@ -1013,6 +1051,38 @@ function bindSmartDraft() {
       smartDraft.diagnosis = diagnosis.value;
     };
   }
+
+  const taxIncluded = document.getElementById("smart-tax-included");
+  if (taxIncluded) {
+    taxIncluded.checked = Boolean(smartDraft.taxIncluded);
+    taxIncluded.onchange = () => {
+      smartDraft.taxIncluded = taxIncluded.checked;
+      renderSmartTotalsOnly();
+    };
+  }
+}
+
+function renderVehicleHistory() {
+  const panel = document.getElementById("smart-vehicle-history");
+  if (!panel) return;
+  const matches = vehicleHistoryFor();
+  if (!matches.length) {
+    panel.innerHTML = smartDraft.vehicle.plate || smartDraft.vehicle.vin
+      ? "<strong>Vehiculo nuevo</strong><p>No encontre servicios previos con esa placa o VIN. Se creara registro al guardar.</p>"
+      : "";
+    return;
+  }
+  const total = matches.reduce((sum, quote) => sum + totals(quote).total, 0);
+  const last = matches
+    .slice()
+    .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  panel.innerHTML = `
+    <strong>Historial encontrado</strong>
+    <p>Cliente asociado: ${escapeHtml(last.clientName || "Pendiente")}</p>
+    <p>Cotizaciones anteriores: ${matches.length}</p>
+    <p>Ultimo servicio: ${new Date(last.date).toLocaleDateString("es-MX")}</p>
+    <p>Total historico: ${money(total)}</p>
+  `;
 }
 
 function renderSmartLines() {
@@ -1058,6 +1128,7 @@ function renderSmart() {
   document.getElementById("smart-status-label").textContent = smartDraft.status;
   document.querySelectorAll("[data-smart-status]").forEach((button) => button.classList.toggle("active", button.dataset.smartStatus === smartDraft.status));
   renderSmartTotalsOnly();
+  renderVehicleHistory();
 }
 
 function render() {
@@ -1073,7 +1144,7 @@ function render() {
 
 function saveQuote(status) {
   const missing = missingData();
-  if (status !== "Borrador" && missing.length) {
+  if (!["Borrador", "Pendiente"].includes(status) && missing.length) {
     alert(`Leonardo, faltan estos datos antes de generar la cotizacion: ${missing.join(", ")}.`);
     return null;
   }
@@ -1260,7 +1331,7 @@ function escapeHtml(value) {
 
 function setup() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => go(button.dataset.go)));
-  document.querySelector("[data-new-voice]").addEventListener("click", () => {
+  document.querySelector("[data-new-voice]")?.addEventListener("click", () => {
     draft = parseVoice("");
     document.getElementById("dictation").value = "";
     go("quote");
@@ -1282,7 +1353,7 @@ function setup() {
       ? "Huella activada en este celular."
       : "Primero escribe usuario y contrasena. Luego toca ACTIVAR HUELLA.";
   });
-  document.querySelector("[data-manual]").addEventListener("click", () => {
+  document.querySelector("[data-manual]")?.addEventListener("click", () => {
     draft = parseVoice("");
     document.getElementById("dictation").value = "";
     go("quote");
@@ -1395,31 +1466,36 @@ function setup() {
     const file = event.target.files?.[0];
     if (!file) return;
     smartDraft.cardImage = await dataUrlFromFile(file);
-    smartDraft.aiMessage = "Foto cargada. Toca LEER TARJETA GRATIS o captura los datos manualmente.";
+    smartDraft.aiMessage = "Foto cargada. Toca LEER TARJETA CON IA o captura los datos manualmente.";
     renderSmart();
+  });
+  document.getElementById("smart-retake-button")?.addEventListener("click", () => {
+    const input = document.getElementById("smart-card-photo");
+    input.value = "";
+    input.click();
   });
   document.getElementById("smart-scan-button").addEventListener("click", async () => {
     const button = document.getElementById("smart-scan-button");
     const status = document.getElementById("smart-scan-status");
     const original = button.textContent;
     if (!smartDraft.cardImage) {
-      status.textContent = "Primero toma o sube una foto de la tarjeta.";
+      status.textContent = "Primero toma una foto de la tarjeta.";
       return;
     }
     try {
       button.textContent = "LEYENDO TARJETA...";
-      status.textContent = "Leyendo imagen con OCR gratis. Revisa y corrige cualquier dato sugerido.";
+      status.textContent = "Leyendo imagen con IA. Revisa y corrige cualquier dato sugerido.";
       const vehicle = await analyzeVehicleCard(smartDraft.cardImage);
       if (vehicle.__error) {
         status.textContent = "No se pudo leer automaticamente. Puedes llenar los datos manualmente.";
-        smartDraft.aiMessage = `OCR gratis no disponible: ${vehicle.__error}`;
+        smartDraft.aiMessage = `Lectura no disponible: ${vehicle.__error}`;
         return;
       }
       const cleanVehicle = Object.fromEntries(Object.entries(vehicle).filter(([key, value]) => key !== "__error" && value));
       smartDraft.vehicle = { ...smartDraft.vehicle, ...cleanVehicle };
       status.textContent = Object.values(cleanVehicle).some(Boolean) ? "Lectura terminada. Revisa los datos sugeridos." : "No encontre datos claros. Intenta otra foto mas derecha y con luz.";
       smartDraft.aiMessage = Object.values(cleanVehicle).some(Boolean)
-        ? "Datos de vehiculo sugeridos por OCR gratis. Revisa placa, VIN, marca, modelo y ano antes de continuar."
+        ? "Datos de vehiculo sugeridos por IA. Revisa placa, VIN, marca, modelo y ano antes de continuar."
         : "No encontre datos claros. Intenta otra foto con buena luz o capturalos manualmente.";
     } finally {
       button.textContent = original;
@@ -1505,9 +1581,9 @@ function setup() {
   document.getElementById("smart-save-review").addEventListener("click", () => {
     if (!confirm("Guardar esta precotizacion como borrador en revision? No se enviara al cliente.")) return;
     draft = smartToQuoteDraft();
-    const quote = saveQuote("Borrador");
+    const quote = saveQuote("Pendiente");
     if (quote) {
-      quote.status = smartDraft.status === "Aprobada" ? "Aceptada" : "Borrador";
+      quote.status = smartDraft.status === "Aprobada" ? "Aprobada" : "Pendiente";
       syncCloudState();
     }
   });
@@ -1519,7 +1595,7 @@ function setup() {
       renderQuote();
     }
   });
-  document.getElementById("draft-button").addEventListener("click", () => saveQuote("Borrador"));
+  document.getElementById("draft-button").addEventListener("click", () => saveQuote("Pendiente"));
   document.getElementById("save-button").addEventListener("click", () => saveQuote("Enviada"));
   document.getElementById("pdf-button").addEventListener("click", async () => {
     const missing = missingData();

@@ -16,7 +16,10 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at 20% 0%, rgba(255, 196, 0, 0.18), transparent 28%), var(--bg);
+  background:
+    radial-gradient(circle at 78% 10%, rgba(255, 154, 0, 0.2), transparent 24%),
+    radial-gradient(circle at 20% 0%, rgba(255, 196, 0, 0.18), transparent 28%),
+    var(--bg);
   color: var(--white);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   overflow-x: hidden;
@@ -56,6 +59,11 @@ button {
   display: block;
 }
 
+.subtitle {
+  margin: -10px 0 14px;
+  color: var(--muted);
+}
+
 h1,
 h2,
 p {
@@ -90,6 +98,24 @@ li {
   text-align: center;
   box-shadow: 0 0 22px rgba(255, 196, 0, 0.2);
   margin-bottom: 18px;
+}
+
+.login-hero {
+  min-height: 430px;
+  display: grid;
+  align-content: center;
+  gap: 18px;
+}
+
+.login-hero .brand-logo {
+  max-height: 230px;
+}
+
+.fingerprint-mark {
+  color: var(--gold);
+  font-size: 84px;
+  line-height: 1;
+  text-shadow: 0 0 22px rgba(255, 196, 0, 0.6);
 }
 
 .brand-logo {
@@ -179,6 +205,83 @@ li {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.dashboard-head {
+  margin-bottom: 12px;
+}
+
+.icon-button {
+  width: 42px;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--gold);
+}
+
+.workshop-summary {
+  display: grid;
+  grid-template-columns: 1fr 130px;
+  gap: 12px;
+  align-items: center;
+  background: linear-gradient(135deg, #111318, #0b0c0f);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.workshop-summary span,
+.workshop-summary small {
+  display: block;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.workshop-summary strong {
+  display: block;
+  color: var(--white);
+  font-size: 36px;
+  line-height: 1;
+  margin: 8px 0 4px;
+}
+
+.car-silhouette {
+  height: 78px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: radial-gradient(circle, rgba(255, 196, 0, 0.24), transparent 68%), #171a20;
+  color: rgba(255, 196, 0, 0.72);
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: 3px;
+}
+
+.home-menu {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  text-align: left;
+}
+
+.menu-button span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 20px;
 }
 
 .page-title {
@@ -398,6 +501,32 @@ button {
   position: relative;
 }
 
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin: -4px 0 14px;
+}
+
+.stepper span {
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 950;
+  background: #07080a;
+}
+
+.stepper span.active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #050505;
+}
+
 .step-title {
   display: flex;
   align-items: center;
@@ -426,6 +555,93 @@ button {
   color: var(--white);
   text-align: center;
   padding: 18px;
+}
+
+.scan-instruction {
+  margin: 4px 0 10px;
+  color: var(--white);
+  font-size: 13px;
+}
+
+.scanner-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 236px;
+  border: 0;
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.58)),
+    radial-gradient(circle at center, rgba(255, 196, 0, 0.18), rgba(10, 10, 10, 0.98) 72%);
+  color: var(--white);
+  overflow: hidden;
+  text-align: center;
+  padding: 26px;
+}
+
+.scanner-frame::before {
+  content: "";
+  position: absolute;
+  width: min(86%, 390px);
+  aspect-ratio: 1.65;
+  border: 1px solid rgba(255, 196, 0, 0.95);
+  border-radius: 10px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.42), 0 0 24px rgba(255, 196, 0, 0.22);
+}
+
+.scanner-frame input {
+  display: none;
+}
+
+.scanner-frame strong,
+.scanner-frame small {
+  position: relative;
+  z-index: 1;
+}
+
+.scanner-frame strong {
+  color: var(--gold);
+  font-size: 19px;
+}
+
+.scanner-frame small {
+  max-width: 260px;
+}
+
+.corner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  z-index: 2;
+  border-color: var(--gold);
+}
+
+.corner.tl {
+  left: 8%;
+  top: 22%;
+  border-left: 3px solid;
+  border-top: 3px solid;
+}
+
+.corner.tr {
+  right: 8%;
+  top: 22%;
+  border-right: 3px solid;
+  border-top: 3px solid;
+}
+
+.corner.bl {
+  left: 8%;
+  bottom: 22%;
+  border-left: 3px solid;
+  border-bottom: 3px solid;
+}
+
+.corner.br {
+  right: 8%;
+  bottom: 22%;
+  border-right: 3px solid;
+  border-bottom: 3px solid;
 }
 
 .upload-card input {
@@ -473,6 +689,42 @@ button {
   border-top: 1px solid var(--line);
   margin-top: 14px;
   padding-top: 12px;
+}
+
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--white);
+}
+
+.inline-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.vehicle-history {
+  margin-top: 12px;
+  border: 1px solid rgba(255, 196, 0, 0.35);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 196, 0, 0.07);
+}
+
+.vehicle-history:empty {
+  display: none;
+}
+
+.vehicle-history strong {
+  display: block;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+.quote-row strong[data-status-color="Pendiente"],
+.status-pill.pending {
+  color: var(--gold);
 }
 
 .smart-status button.active {
@@ -578,6 +830,44 @@ th:last-child {
   border: 1px solid var(--gold);
   color: var(--gold);
   font-size: 11px;
+}
+
+.status-pill {
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 6px 9px;
+  color: var(--gold);
+  font-size: 12px;
+}
+
+.status-pill.enviada {
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
+.status-pill.aprobada {
+  border-color: #49e12f;
+  color: #8df071;
+}
+
+.status-pill.en-reparacion {
+  border-color: #ff9900;
+  color: #ffb13b;
+}
+
+.status-pill.lista {
+  border-color: #a855f7;
+  color: #d8b4fe;
+}
+
+.status-pill.facturada {
+  border-color: #8b5cf6;
+  color: #c4b5fd;
+}
+
+.status-pill.cancelada {
+  border-color: #ef4444;
+  color: #fca5a5;
 }
 
 .tabbar {
