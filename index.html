@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=41" />
+    <link rel="stylesheet" href="./styles.css?v=42" />
     <title>Servicio Solis Cotizador</title>
   </head>
   <body>
@@ -65,17 +65,17 @@
             <span><b>Nueva cotización</b><small>Crear una cotización</small></span>
             <i>›</i>
           </button>
-          <button class="menu-card" data-go="history">
+          <button class="menu-card" data-go="history" data-history-mode="quotes">
             <span class="menu-icon">📄</span>
             <span><b>Cotizaciones guardadas</b><small>Ver todas tus cotizaciones</small></span>
             <i>›</i>
           </button>
-          <button class="menu-card" data-go="history">
+          <button class="menu-card" data-go="history" data-history-mode="work">
             <span class="menu-icon">🛠️</span>
             <span><b>Trabajos en proceso</b><small>Órdenes activas</small></span>
             <i>›</i>
           </button>
-          <button class="menu-card" data-go="history">
+          <button class="menu-card" data-go="history" data-history-mode="invoices">
             <span class="menu-icon">💵</span>
             <span><b>Facturas e historial</b><small>Consulta facturas emitidas</small></span>
             <i>›</i>
@@ -101,7 +101,7 @@
           <button class="back" data-go="home">VOLVER</button>
           <h1>Cotizacion</h1>
         </header>
-        <article class="mic-card">
+        <article class="mic-card legacy-voice-tools" hidden>
           <div class="mic" id="mic-status">MIC</div>
           <h2 id="listen-label">Dictado por voz</h2>
           <p class="voice-intro">Dime que necesita el cliente, que vehiculo trae y cuanto cuesta el trabajo.</p>
@@ -241,9 +241,10 @@
       <section class="screen" id="screen-history">
         <header class="page-title">
           <button class="back" data-go="home">VOLVER</button>
-          <h1>Historial</h1>
+          <h1 id="history-title">Cotizaciones guardadas</h1>
         </header>
         <label>Buscar<input id="search" placeholder="Cliente, folio, vehiculo o estatus" /></label>
+        <p class="empty-hint" id="history-hint"></p>
         <div id="history-list"></div>
       </section>
 
@@ -286,6 +287,6 @@
       </nav>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script type="module" src="./app.js?v=41"></script>
+    <script type="module" src="./app.js?v=42"></script>
   </body>
 </html>

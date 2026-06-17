@@ -1,4 +1,4 @@
-const CACHE_NAME = "taller-solis-cotizador-v41";
+const CACHE_NAME = "taller-solis-cotizador-v42";
 const ASSETS = [
   "./",
   "./index.html",

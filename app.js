@@ -20,6 +20,7 @@ let smartDraft = createSmartDraft();
 let listening = false;
 let currentUser = null;
 let isAuthenticated = false;
+let historyMode = "quotes";
 let biometricEnabled = false;
 let biometricAvailable = false;
 let soundEnabled = (() => {
@@ -990,6 +991,10 @@ function activeTabFor(screen) {
   return screen;
 }
 
+function setHistoryMode(mode = "quotes") {
+  historyMode = ["quotes", "work", "invoices"].includes(mode) ? mode : "quotes";
+}
+
 function go(screen) {
   if (!isAuthenticated && screen !== "login") {
     document.querySelectorAll(".screen").forEach((item) => item.classList.remove("active"));
@@ -1095,7 +1100,36 @@ function renderQuote() {
 
 function renderHistory() {
   const query = plain(document.getElementById("search").value).toLowerCase();
-  const list = state.quotes.filter((quote) => !quote.deletedAt && plain(`${quote.folio} ${quote.clientName} ${quote.vehicle} ${quote.status}`).toLowerCase().includes(query));
+  const title = document.getElementById("history-title");
+  const hint = document.getElementById("history-hint");
+  const search = document.getElementById("search");
+  const modeCopy = {
+    quotes: {
+      title: "Cotizaciones guardadas",
+      placeholder: "Cliente, folio, vehiculo o estatus",
+      empty: "Aqui apareceran tus cotizaciones guardadas."
+    },
+    work: {
+      title: "Trabajos en proceso",
+      placeholder: "Cliente, folio o vehiculo en reparacion",
+      empty: "Aqui apareceran las cotizaciones con estatus En reparacion."
+    },
+    invoices: {
+      title: "Facturas e historial",
+      placeholder: "Cliente, folio o factura",
+      empty: "Aqui solo apareceran cotizaciones con estatus Facturada."
+    }
+  };
+  const copy = modeCopy[historyMode] || modeCopy.quotes;
+  if (title) title.textContent = copy.title;
+  if (search) search.placeholder = copy.placeholder;
+  const list = state.quotes.filter((quote) => {
+    if (quote.deletedAt) return false;
+    if (historyMode === "invoices" && quote.status !== "Facturada") return false;
+    if (historyMode === "work" && quote.status !== "En reparación") return false;
+    return plain(`${quote.folio} ${quote.clientName} ${quote.vehicle} ${quote.status}`).toLowerCase().includes(query);
+  });
+  if (hint) hint.textContent = list.length ? "" : copy.empty;
   document.getElementById("history-list").innerHTML =
     list
       .map(
@@ -1509,7 +1543,13 @@ function escapeHtml(value) {
 }
 
 function setup() {
-  document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => go(button.dataset.go)));
+  document.querySelectorAll("[data-go]").forEach((button) =>
+    button.addEventListener("click", () => {
+      if (button.dataset.historyMode) setHistoryMode(button.dataset.historyMode);
+      if (button.dataset.go === "history" && !button.dataset.historyMode) setHistoryMode("quotes");
+      go(button.dataset.go);
+    })
+  );
   document.querySelector("[data-new-voice]")?.addEventListener("click", () => {
     draft = parseVoice("");
     document.getElementById("dictation").value = "";
@@ -1825,6 +1865,7 @@ function setup() {
       const source = state.quotes.find((quote) => quote.id === id);
       if (source) {
         draft = structuredClone(source);
+        document.getElementById("dictation").value = "";
         go("quote");
         return;
       }
