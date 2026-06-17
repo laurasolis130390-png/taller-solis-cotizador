@@ -1,4 +1,4 @@
-const CACHE_NAME = "taller-solis-cotizador-v42";
+const CACHE_NAME = "taller-solis-cotizador-v44";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,7 +13,8 @@ const ASSETS = [
   "./android-chrome-192x192.png",
   "./android-chrome-512x512.png",
   "./favicon-192.png",
-  "./logo-solis.png"
+  "./logo-solis.png",
+  "./summary-car.png"
 ];
 
 self.addEventListener("install", (event) => {
