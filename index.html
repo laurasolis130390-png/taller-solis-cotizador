@@ -35,14 +35,15 @@
 
       <section class="screen" id="screen-home">
         <header class="hero-top">
-          <button class="top-icon" type="button" aria-label="Menu">☰</button>
+          <button class="top-icon" type="button" aria-label="Menu">MENU</button>
           <img class="home-hero-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
-          <button class="top-icon notify" type="button" aria-label="Notificaciones">•</button>
+          <button class="top-icon notify" type="button" aria-label="Notificaciones">!</button>
         </header>
+
         <article class="welcome-card">
           <div class="welcome-copy">
-            <h1>¡Bienvenido,<br><span>Leonardo!</span></h1>
-            <p>Servicio Solís</p>
+            <h1>Bienvenido,<br><span>Leonardo!</span></h1>
+            <p>Servicio Solis</p>
             <div class="summary-box">
               <b>Resumen del taller</b>
               <strong id="dashboard-active-hero">0</strong>
@@ -52,46 +53,25 @@
           </div>
           <div class="garage-car"></div>
         </article>
-        <header class="header dashboard-head">
-          <div class="brand compact">
-            <img class="brand-logo compact-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
-            <span>A TUS ORDENES</span>
-            <strong>SERVICIO SOLIS</strong>
-            <b>COTIZADOR</b>
-          </div>
-          <button class="icon-button" type="button" aria-label="Notificaciones">!</button>
-        </header>
-        <h1>Bienvenido, Leonardo</h1>
-        <p class="subtitle">Servicio Solis</p>
-        <article class="workshop-summary">
-          <div>
-            <span>Resumen del taller</span>
-            <strong id="dashboard-active">0</strong>
-            <small>Cotizaciones activas</small>
-          </div>
-          <div class="car-silhouette">AUTO</div>
-        </article>
+
         <div class="home-menu">
-          <button class="primary full menu-button featured" data-go="smart"><span>+</span><b>NUEVA COTIZACION</b><small>Crear una cotizacion</small><i>›</i></button>
-          <button class="ghost full menu-button" data-go="history"><span>▣</span>COTIZACIONES GUARDADAS</button>
-          <button class="ghost full menu-button" data-go="history"><span>⌁</span>TRABAJOS EN PROCESO</button>
-          <button class="ghost full menu-button" data-go="history"><span>▤</span>FACTURAS / HISTORIAL</button>
-          <button class="ghost full menu-button" data-go="clients"><span>◎</span>CLIENTES</button>
+          <button class="primary full menu-button featured" data-go="smart"><span>+</span><b>NUEVA COTIZACION</b><small>Crear una cotizacion</small><i>&gt;</i></button>
+          <button class="ghost full menu-button" data-go="history"><span>C</span><b>COTIZACIONES GUARDADAS</b><small>Ver y administrar</small><i>&gt;</i></button>
+          <button class="ghost full menu-button" data-go="history"><span>T</span><b>TRABAJOS EN PROCESO</b><small>Ordenes activas</small><i>&gt;</i></button>
+          <button class="ghost full menu-button" data-go="history"><span>$</span><b>FACTURAS / HISTORIAL</b><small>Ver facturas</small><i>&gt;</i></button>
+          <button class="ghost full menu-button" data-go="clients"><span>U</span><b>CLIENTES</b><small>Lista de clientes</small><i>&gt;</i></button>
         </div>
-        <section class="metrics">
+
+        <section class="metrics home-metrics">
           <article><strong id="metric-count">0</strong><span>Cotizaciones</span></article>
           <article><strong id="metric-total">$0.00</strong><span>Total cotizado</span></article>
-          <article><strong id="metric-accepted">0</strong><span>Aceptadas</span></article>
+          <article><strong id="metric-accepted">0</strong><span>Aprobadas</span></article>
           <article><strong id="metric-pending">0</strong><span>Pendientes</span></article>
         </section>
-        <article class="panel">
-          <h2>Asi de facil funciona</h2>
-          <ol>
-            <li>Dictas la informacion del cliente y del vehiculo.</li>
-            <li>La app acomoda los datos y sugiere redaccion tecnica.</li>
-            <li>Revisas importes, IVA, total y observaciones.</li>
-            <li>Guardas la cotizacion y la compartes por WhatsApp.</li>
-          </ol>
+
+        <article class="service-banner">
+          <div>A TU SERVICIO,<br><span>SIEMPRE.</span></div>
+          <img src="./logo-solis.png?v=2" alt="Servicio Solis" />
         </article>
       </section>
 
