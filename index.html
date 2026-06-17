@@ -3,13 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#050505" />
+    <meta name="theme-color" content="#0E0E10" />
     <meta name="description" content="Servicio Solis Cotizador para generar cotizaciones mecanicas profesionales desde celular." />
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" type="image/png" sizes="192x192" href="./favicon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="./android-chrome-512x512.png" />
     <link rel="apple-touch-icon" href="./android-chrome-512x512.png" />
-    <link rel="stylesheet" href="./styles.css?v=40" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=41" />
     <title>Servicio Solis Cotizador</title>
   </head>
   <body>
@@ -38,32 +41,50 @@
       </section>
 
       <section class="screen" id="screen-home">
-        <header class="hero-top">
-          <button class="top-icon" type="button" aria-label="Menu">MENU</button>
-          <img class="home-hero-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
-          <button class="top-icon notify" type="button" aria-label="Notificaciones">!</button>
+        <header class="home-header">
+          <div>
+            <h1>Hola, Leonardo <span aria-hidden="true">👋</span></h1>
+            <p>Servicio Solís</p>
+          </div>
+          <button class="home-bell" type="button" aria-label="Notificaciones">🔔</button>
         </header>
 
-        <article class="welcome-card">
-          <div class="welcome-copy">
-            <h1>Bienvenido,<br><span>Leonardo!</span></h1>
-            <p>Servicio Solis</p>
-            <div class="summary-box">
-              <b>Resumen del taller</b>
-              <strong id="dashboard-active-hero">0</strong>
-              <small>Cotizaciones activas</small>
-              <em id="ai-usage-badge">IA 0</em>
-            </div>
+        <article class="home-summary">
+          <div class="summary-copy">
+            <span>Resumen del taller</span>
+            <strong id="dashboard-active-hero">0</strong>
+            <small>Cotizaciones activas</small>
+            <em id="ai-usage-badge">IA 0</em>
           </div>
-          <div class="garage-car"></div>
+          <div class="summary-car" aria-hidden="true"></div>
         </article>
 
         <div class="home-menu">
-          <button class="primary full menu-button featured" data-go="smart"><span>+</span><b>NUEVA COTIZACION</b><small>Crear una cotizacion</small><i>&gt;</i></button>
-          <button class="ghost full menu-button" data-go="history"><span>C</span><b>COTIZACIONES GUARDADAS</b><small>Ver y administrar</small><i>&gt;</i></button>
-          <button class="ghost full menu-button" data-go="history"><span>T</span><b>TRABAJOS EN PROCESO</b><small>Ordenes activas</small><i>&gt;</i></button>
-          <button class="ghost full menu-button" data-go="history"><span>$</span><b>FACTURAS / HISTORIAL</b><small>Ver facturas</small><i>&gt;</i></button>
-          <button class="ghost full menu-button" data-go="clients"><span>U</span><b>CLIENTES</b><small>Lista de clientes</small><i>&gt;</i></button>
+          <button class="menu-card primary-card" data-go="smart">
+            <span class="menu-icon">＋</span>
+            <span><b>Nueva cotización</b><small>Crear una cotización</small></span>
+            <i>›</i>
+          </button>
+          <button class="menu-card" data-go="history">
+            <span class="menu-icon">📄</span>
+            <span><b>Cotizaciones guardadas</b><small>Ver todas tus cotizaciones</small></span>
+            <i>›</i>
+          </button>
+          <button class="menu-card" data-go="history">
+            <span class="menu-icon">🛠️</span>
+            <span><b>Trabajos en proceso</b><small>Órdenes activas</small></span>
+            <i>›</i>
+          </button>
+          <button class="menu-card" data-go="history">
+            <span class="menu-icon">💵</span>
+            <span><b>Facturas e historial</b><small>Consulta facturas emitidas</small></span>
+            <i>›</i>
+          </button>
+          <button class="menu-card" data-go="clients">
+            <span class="menu-icon">👥</span>
+            <span><b>Clientes</b><small>Lista de clientes registrados</small></span>
+            <i>›</i>
+          </button>
         </div>
 
         <section class="metrics home-metrics">
@@ -73,10 +94,6 @@
           <article><strong id="metric-pending">0</strong><span>Pendientes</span></article>
         </section>
 
-        <article class="service-banner">
-          <div>A TU SERVICIO,<br><span>SIEMPRE.</span></div>
-          <img src="./logo-solis.png?v=2" alt="Servicio Solis" />
-        </article>
       </section>
 
       <section class="screen" id="screen-quote">
@@ -245,15 +262,30 @@
         <div id="client-list"></div>
       </section>
 
+      <section class="screen" id="screen-settings">
+        <header class="page-title">
+          <button class="back" data-go="home">Volver</button>
+          <h1>Ajustes</h1>
+        </header>
+        <article class="panel">
+          <h2>Actualizaciones</h2>
+          <p>La app revisa versiones nuevas automáticamente para que no tengas que instalarla otra vez.</p>
+          <button class="primary full" id="manual-update-button" type="button">Buscar actualización</button>
+        </article>
+        <article class="panel">
+          <h2>Uso de IA</h2>
+          <p>Solicitudes registradas en esta app: <strong id="settings-ai-usage">0</strong></p>
+        </article>
+      </section>
+
       <nav class="tabbar locked">
-        <button data-go="home">INICIO</button>
-        <button data-go="quote">VOZ</button>
-        <button data-go="smart">IA</button>
-        <button data-go="history">HISTORIAL</button>
-        <button data-go="clients">CLIENTES</button>
+        <button data-go="home"><span>🏠</span><b>Inicio</b></button>
+        <button data-go="history"><span>📄</span><b>Cotizaciones</b></button>
+        <button data-go="clients"><span>👥</span><b>Clientes</b></button>
+        <button data-go="settings"><span>⚙️</span><b>Ajustes</b></button>
       </nav>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script type="module" src="./app.js?v=40"></script>
+    <script type="module" src="./app.js?v=41"></script>
   </body>
 </html>

@@ -985,6 +985,11 @@ function nextFolio() {
   return `TS-${year}-${String(max + 1).padStart(4, "0")}`;
 }
 
+function activeTabFor(screen) {
+  if (["quote", "smart", "history"].includes(screen)) return "history";
+  return screen;
+}
+
 function go(screen) {
   if (!isAuthenticated && screen !== "login") {
     document.querySelectorAll(".screen").forEach((item) => item.classList.remove("active"));
@@ -994,9 +999,11 @@ function go(screen) {
     window.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
+  const target = document.querySelector(`#screen-${screen}`) ? screen : "home";
   document.querySelectorAll(".screen").forEach((item) => item.classList.remove("active"));
-  document.querySelector(`#screen-${screen}`).classList.add("active");
-  document.querySelectorAll(".tabbar button").forEach((button) => button.classList.toggle("active", button.dataset.go === screen));
+  document.querySelector(`#screen-${target}`).classList.add("active");
+  const activeTab = activeTabFor(target);
+  document.querySelectorAll(".tabbar button").forEach((button) => button.classList.toggle("active", button.dataset.go === activeTab));
   document.querySelector(".tabbar")?.classList.toggle("locked", !isAuthenticated);
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1043,6 +1050,8 @@ function renderHome() {
   if (activeDashboardHero) activeDashboardHero.textContent = monthQuotes.filter((quote) => ["Pendiente", "Enviada", "Aprobada", "En reparación"].includes(quote.status)).length;
   const aiBadge = document.getElementById("ai-usage-badge");
   if (aiBadge) aiBadge.textContent = `IA ${state.aiUsage?.total || 0}`;
+  const settingsAiUsage = document.getElementById("settings-ai-usage");
+  if (settingsAiUsage) settingsAiUsage.textContent = state.aiUsage?.total || 0;
   document.getElementById("metric-total").textContent = money(monthQuotes.reduce((sum, quote) => sum + totals(quote).total, 0));
   document.getElementById("metric-accepted").textContent = monthQuotes.filter((quote) => ["Aprobada", "Aceptada", "Facturada", "Pagada"].includes(quote.status)).length;
   document.getElementById("metric-pending").textContent = monthQuotes.filter((quote) => ["Pendiente", "Borrador", "Enviada"].includes(quote.status)).length;
@@ -1506,6 +1515,7 @@ function setup() {
     document.getElementById("dictation").value = "";
     go("quote");
   });
+  document.getElementById("manual-update-button")?.addEventListener("click", refreshAppNow);
   updateSoundButton();
   document.getElementById("sound-button")?.addEventListener("click", toggleSound);
   biometricEnabled = Boolean(localStorage.getItem(BIOMETRIC_KEY));
