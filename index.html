@@ -34,6 +34,24 @@
       </section>
 
       <section class="screen" id="screen-home">
+        <header class="hero-top">
+          <button class="top-icon" type="button" aria-label="Menu">☰</button>
+          <img class="home-hero-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
+          <button class="top-icon notify" type="button" aria-label="Notificaciones">•</button>
+        </header>
+        <article class="welcome-card">
+          <div class="welcome-copy">
+            <h1>¡Bienvenido,<br><span>Leonardo!</span></h1>
+            <p>Servicio Solís</p>
+            <div class="summary-box">
+              <b>Resumen del taller</b>
+              <strong id="dashboard-active-hero">0</strong>
+              <small>Cotizaciones activas</small>
+              <em id="ai-usage-badge">IA 0</em>
+            </div>
+          </div>
+          <div class="garage-car"></div>
+        </article>
         <header class="header dashboard-head">
           <div class="brand compact">
             <img class="brand-logo compact-logo" src="./logo-solis.png?v=2" alt="Servicio Solis" onerror="this.classList.add('missing')" />
@@ -54,7 +72,7 @@
           <div class="car-silhouette">AUTO</div>
         </article>
         <div class="home-menu">
-          <button class="primary full menu-button" data-go="smart"><span>+</span>NUEVA COTIZACION</button>
+          <button class="primary full menu-button featured" data-go="smart"><span>+</span><b>NUEVA COTIZACION</b><small>Crear una cotizacion</small><i>›</i></button>
           <button class="ghost full menu-button" data-go="history"><span>▣</span>COTIZACIONES GUARDADAS</button>
           <button class="ghost full menu-button" data-go="history"><span>⌁</span>TRABAJOS EN PROCESO</button>
           <button class="ghost full menu-button" data-go="history"><span>▤</span>FACTURAS / HISTORIAL</button>
@@ -172,8 +190,6 @@
             <label>Año<input id="smart-year" inputmode="numeric" /></label>
             <label class="wide">Numero de serie / VIN<input id="smart-vin" /></label>
             <label>Color<input id="smart-color" /></label>
-            <label>Entidad<input id="smart-state" /></label>
-            <label>Kilometraje<input id="smart-mileage" inputmode="numeric" /></label>
           </div>
           <div class="vehicle-history" id="smart-vehicle-history"></div>
         </article>

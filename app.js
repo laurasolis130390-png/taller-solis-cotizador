@@ -13,7 +13,7 @@ const sampleDictation =
   "Cliente Juan Perez, camioneta Nissan NP300 2016, cambio de clutch completo, plato, disco y balero, mano de obra seis mil pesos mas IVA, diagnostico: la camioneta no avanza por falla total del clutch";
 
 let state = loadState();
-let draft = parseVoice(sampleDictation);
+let draft = parseVoice("");
 let smartDraft = createSmartDraft();
 let listening = false;
 let currentUser = null;
@@ -33,36 +33,50 @@ let welcomeSpoken = false;
 let smartCameraStream = null;
 
 function starterState() {
-  const quote = {
-    ...parseVoice(sampleDictation),
-    id: "q-demo",
-    folio: "TS-2026-0001",
-    status: "Enviada",
-    date: new Date().toISOString()
-  };
   return {
-    quotes: [quote],
-    clients: [{ id: "cl-demo", name: "Juan Perez", phone: "55 1234 5678", vehicles: ["Nissan NP300 2016"] }]
+    quotes: [],
+    clients: [],
+    aiUsage: { total: 0, cardReads: 0, quoteReads: 0 }
   };
 }
 
 function loadState() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || starterState();
+    return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)) || starterState());
   } catch {
     return starterState();
   }
+}
+
+function normalizeState(saved) {
+  const clean = saved || starterState();
+  clean.quotes = (clean.quotes || []).filter((quote) => quote.id !== "q-demo" && !quote.deletedAt);
+  clean.clients = (clean.clients || []).filter((client) => client.id !== "cl-demo");
+  clean.aiUsage = clean.aiUsage || { total: 0, cardReads: 0, quoteReads: 0 };
+  clean.aiUsage.total = Number(clean.aiUsage.total || 0);
+  clean.aiUsage.cardReads = Number(clean.aiUsage.cardReads || 0);
+  clean.aiUsage.quoteReads = Number(clean.aiUsage.quoteReads || 0);
+  return clean;
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function trackAiUsage(kind) {
+  state.aiUsage = state.aiUsage || { total: 0, cardReads: 0, quoteReads: 0 };
+  state.aiUsage.total += 1;
+  if (kind === "card") state.aiUsage.cardReads += 1;
+  if (kind === "quote") state.aiUsage.quoteReads += 1;
+  saveState();
+  if (currentUser) syncCloudState();
+}
+
 function createSmartDraft() {
   return {
     status: "Borrador",
     cardImage: "",
-    vehicle: { plate: "", brand: "", model: "", year: "", vin: "", color: "", state: "", mileage: "" },
+    vehicle: { plate: "", brand: "", model: "", year: "", vin: "", color: "" },
     client: { name: "", phone: "", email: "", notes: "" },
     diagnosis: "",
     aiMessage: "Esperando diagnostico para sugerir trabajos, refacciones y mano de obra.",
@@ -293,8 +307,9 @@ async function loadCloudState() {
     return;
   }
   if (data?.payload?.quotes && data?.payload?.clients) {
-    state = data.payload;
+    state = normalizeState(data.payload);
     saveState();
+    await syncCloudState();
   } else {
     await syncCloudState();
   }
@@ -350,6 +365,7 @@ async function parseWithAssistant(text) {
   try {
     const { data, error } = await supabase.functions.invoke("bright-worker", { body: { text } });
     if (error) throw error;
+    trackAiUsage("quote");
     return normalizeAiDraft(data, text);
   } catch (error) {
     console.warn("IA no disponible, usando extractor local", error.message);
@@ -545,6 +561,7 @@ async function analyzeVehicleCard(imageData) {
       const { data, error } = await supabase.functions.invoke("vehicle-card", { body: { image: imageData } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      trackAiUsage("card");
       return normalizeVehicleCard(data);
     } catch (error) {
       console.warn("IA de tarjeta no disponible, usando lectura local", error.message);
@@ -610,7 +627,7 @@ function smartToQuoteDraft() {
     parts: smartDraft.lines.filter((item) => item.type === "refaccion").map((item) => item.concept).join(", "),
     observations: [
       smartDraft.client.notes,
-      `Modulo: Cotizacion inteligente. Estado: ${smartDraft.status}. VIN: ${smartDraft.vehicle.vin || "Pendiente"}. Kilometraje: ${smartDraft.vehicle.mileage || "Pendiente"}. Entidad: ${smartDraft.vehicle.state || "Pendiente"}.`
+      `Modulo: Cotizacion inteligente. Estado: ${smartDraft.status}. VIN: ${smartDraft.vehicle.vin || "Pendiente"}.`
     ]
       .filter(Boolean)
       .join("\n"),
@@ -777,9 +794,49 @@ function extractDiagnosis(clean) {
   return direct ? titleCase(direct) : titleCase(clean);
 }
 
+function cleanTechnicalSubject(text) {
+  const raw = plain(text).toLowerCase();
+  let clean = raw
+    .replace(/\b(mi|un|una)\s+client[ea]\s+[^,.]{0,60}?(?:me\s+)?(?:trajo|trae|llevo|llego|vino)\s+(?:su\s+)?(?:coche|carro|vehiculo|unidad|camioneta)?\s*(?:porque|por que|con|y)?/gi, " ")
+    .replace(/\b(?:cliente|clienta)\s+(?:se\s+llama\s+)?[a-z\s]{2,50}?(?=\s+(?:trajo|trae|tiene|con|porque|por que|su|coche|carro|vehiculo|unidad))/gi, " ")
+    .replace(/\b(?:me\s+)?(?:trajo|trae|llevo|llego|vino)\s+(?:su\s+)?(?:coche|carro|vehiculo|unidad|camioneta)?\s*(?:porque|por que|con|y)?/gi, " ")
+    .replace(/\b(voy a|vamos a|creo que|pienso que|al parecer|ahora|este|pues|eh|este)\b/gi, " ")
+    .replace(/\b(revisarla|revisarlo)\b/gi, "revisar")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const afterProblem =
+    clean.match(/(?:porque|por que|presenta|se escucha|suena|hace ruido|tiene ruido|le suena|le encontre|detecte|se detecta)\s+(.+)/i)?.[1] ||
+    clean;
+
+  clean = afterProblem
+    .replace(/\b(?:hay que|se debe|se recomienda|voy a)\b.*$/i, "")
+    .replace(/\b(?:precio|cuesta|total|pesos?|mxn)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const hasRearTire = /\b(llanta|rueda)\s+trasera\b/.test(clean) || /\btrasera\b/.test(clean);
+  const hasBearing = /\b(balero|rodamiento)\b/.test(clean);
+  const hasNoise = /\b(suena|ruido|sonido|golpe|rechino|zumbido)\b/.test(clean);
+
+  if (hasRearTire && hasBearing) return "ruido en la zona de la llanta trasera, con posible desgaste de balero";
+  if (hasRearTire && hasNoise) return "ruido en la zona de la llanta trasera";
+  if (hasBearing) return "posible desgaste de balero";
+  if (/\b(horquilla|orquilla)\b/.test(clean)) return "ruido o desgaste en horquilla de suspension";
+  if (/\b(clutch|embrague)\b/.test(clean)) return "falla en el sistema de clutch";
+  if (/\b(freno|balata)\b/.test(clean)) return "desgaste o falla en el sistema de frenos";
+
+  clean = clean
+    .replace(/\b(suena|le suena|hace ruido|tiene ruido)\b/g, "ruido")
+    .replace(/\b(orquilla)\b/g, "horquilla")
+    .replace(/^[,.;:\s]+|[,.;:\s]+$/g, "");
+
+  return clean || "una falla reportada por el cliente";
+}
+
 function technicalText(text) {
-  const base = text.trim() || "se detecta una falla reportada por el cliente";
-  return `Se detecta ${base.toLowerCase().replace(/\.$/, "")}. La condicion compromete el funcionamiento correcto de la unidad, por lo que se recomienda realizar la reparacion indicada, sustituir los componentes necesarios y verificar el sistema mediante prueba de funcionamiento posterior.`;
+  const base = cleanTechnicalSubject(text);
+  return `Se reporta ${base}. Se recomienda realizar revision fisica del componente relacionado, confirmar el diagnostico, efectuar la reparacion indicada y verificar el funcionamiento mediante prueba posterior.`;
 }
 
 function parseVoice(text) {
@@ -931,6 +988,10 @@ function renderHome() {
   document.getElementById("metric-count").textContent = monthQuotes.length;
   const activeDashboard = document.getElementById("dashboard-active");
   if (activeDashboard) activeDashboard.textContent = monthQuotes.filter((quote) => ["Pendiente", "Enviada", "Aprobada", "En reparación"].includes(quote.status)).length;
+  const activeDashboardHero = document.getElementById("dashboard-active-hero");
+  if (activeDashboardHero) activeDashboardHero.textContent = monthQuotes.filter((quote) => ["Pendiente", "Enviada", "Aprobada", "En reparación"].includes(quote.status)).length;
+  const aiBadge = document.getElementById("ai-usage-badge");
+  if (aiBadge) aiBadge.textContent = `IA ${state.aiUsage?.total || 0}`;
   document.getElementById("metric-total").textContent = money(monthQuotes.reduce((sum, quote) => sum + totals(quote).total, 0));
   document.getElementById("metric-accepted").textContent = monthQuotes.filter((quote) => ["Aprobada", "Aceptada", "Facturada", "Pagada"].includes(quote.status)).length;
   document.getElementById("metric-pending").textContent = monthQuotes.filter((quote) => ["Pendiente", "Borrador", "Enviada"].includes(quote.status)).length;
@@ -974,7 +1035,7 @@ function renderQuote() {
 
 function renderHistory() {
   const query = plain(document.getElementById("search").value).toLowerCase();
-  const list = state.quotes.filter((quote) => plain(`${quote.folio} ${quote.clientName} ${quote.vehicle} ${quote.status}`).toLowerCase().includes(query));
+  const list = state.quotes.filter((quote) => !quote.deletedAt && plain(`${quote.folio} ${quote.clientName} ${quote.vehicle} ${quote.status}`).toLowerCase().includes(query));
   document.getElementById("history-list").innerHTML =
     list
       .map(
@@ -993,7 +1054,7 @@ function renderHistory() {
           <button class="ghost" data-duplicate="${quote.id}">DUPLICAR</button>
           <button class="ghost" data-pdf="${quote.id}">PDF</button>
           <button class="success" data-whatsapp="${quote.id}">WHATSAPP</button>
-          <button class="danger" data-delete="${quote.id}">${quote.deletedAt ? "RECUPERAR" : "BORRAR"}</button>
+          <button class="danger" data-delete="${quote.id}">BORRAR</button>
         </div>
       </article>`
       )
@@ -1016,9 +1077,7 @@ function bindSmartDraft() {
     "smart-model": "model",
     "smart-year": "year",
     "smart-vin": "vin",
-    "smart-color": "color",
-    "smart-state": "state",
-    "smart-mileage": "mileage"
+    "smart-color": "color"
   };
   Object.entries(vehicleFields).forEach(([id, key]) => {
     const el = document.getElementById(id);
@@ -1277,7 +1336,7 @@ async function buildPdfDoc(source, folio = nextFolio()) {
   doc.text("Diagnostico / observaciones", cardX + 10, y);
   y += 8;
 
-  const diagnosisText = quote.technical || quote.diagnosis || "Pendiente";
+  const diagnosisText = quote.diagnosis ? technicalText(quote.diagnosis) : quote.technical || "Pendiente";
   const diagnosisLines = splitLines(doc, diagnosisText, cardW - 20);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
@@ -1718,7 +1777,12 @@ function setup() {
       const quote = state.quotes.find((item) => item.id === id);
       if (quote) await sharePdf(quote, quote.folio);
     }
-    if (event.target.dataset.delete) state.quotes = state.quotes.map((quote) => (quote.id === id ? { ...quote, deletedAt: quote.deletedAt ? undefined : new Date().toISOString() } : quote));
+    if (event.target.dataset.delete) {
+      const quote = state.quotes.find((item) => item.id === id);
+      if (quote && confirm(`Borrar definitivamente la cotizacion ${quote.folio}?`)) {
+        state.quotes = state.quotes.filter((item) => item.id !== id);
+      }
+    }
     persistAndRender();
   });
   document.getElementById("client-button").addEventListener("click", () => {
