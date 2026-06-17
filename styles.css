@@ -35,6 +35,43 @@ button {
   cursor: pointer;
 }
 
+.update-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  max-width: 516px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 196, 0, 0.75);
+  border-radius: 8px;
+  background: rgba(8, 9, 12, 0.96);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  padding: 10px;
+}
+
+.update-banner.ready {
+  display: flex;
+}
+
+.update-banner span {
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.update-banner button {
+  min-height: 34px;
+  padding: 8px 11px;
+  background: var(--gold);
+  color: #050505;
+  font-size: 11px;
+}
+
 .app-shell {
   width: 100%;
   max-width: none;
@@ -95,14 +132,14 @@ button {
 .home-hero-logo {
   width: 100%;
   height: auto;
-  max-height: 245px;
+  max-height: 180px;
   object-fit: contain;
   filter: drop-shadow(0 0 28px rgba(255, 196, 0, 0.45));
 }
 
 .welcome-card {
   position: relative;
-  min-height: 250px;
+  min-height: 178px;
   display: grid;
   align-items: stretch;
   overflow: hidden;
@@ -119,31 +156,31 @@ button {
 .welcome-copy {
   position: relative;
   z-index: 2;
-  padding: 22px 18px;
+  padding: 16px 14px;
 }
 
 .welcome-copy h1 {
-  margin: 0 0 14px;
-  font-size: 32px;
+  margin: 0 0 8px;
+  font-size: 24px;
   line-height: 1.05;
 }
 
 .welcome-copy h1 span {
   color: var(--gold);
-  font-size: 40px;
+  font-size: 31px;
 }
 
 .welcome-copy p {
-  font-size: 18px;
+  font-size: 14px;
   color: var(--muted);
-  margin-bottom: 22px;
+  margin-bottom: 12px;
 }
 
 .summary-box {
-  width: min(235px, 100%);
+  width: min(205px, 100%);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   background: rgba(0, 0, 0, 0.45);
 }
 
@@ -156,7 +193,7 @@ button {
 .summary-box strong {
   display: block;
   color: var(--gold);
-  font-size: 34px;
+  font-size: 26px;
   line-height: 1;
   margin: 8px 0;
 }
@@ -177,8 +214,8 @@ button {
   position: absolute;
   right: -30px;
   bottom: 0;
-  width: 62%;
-  height: 82%;
+  width: 58%;
+  height: 76%;
   background:
     radial-gradient(ellipse at 50% 72%, rgba(255, 196, 0, 0.42), transparent 12%),
     linear-gradient(10deg, transparent 30%, rgba(255, 255, 255, 0.28) 31% 33%, transparent 34%),
@@ -190,7 +227,7 @@ button {
 }
 
 .service-banner {
-  display: grid;
+  display: none;
   grid-template-columns: 1fr 150px;
   align-items: center;
   gap: 10px;
@@ -420,10 +457,10 @@ li {
 
 .home-menu {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 14px;
-  padding: 14px;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px;
   border: 1px solid rgba(255, 196, 0, 0.28);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.42);
@@ -432,29 +469,28 @@ li {
 .menu-button {
   position: relative;
   display: grid;
-  grid-template-columns: 44px 1fr 18px;
+  grid-template-columns: 34px minmax(0, 1fr) 16px;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   text-align: left;
-  min-height: 94px;
-  padding: 14px;
+  min-height: 50px;
+  padding: 9px 10px;
   overflow: hidden;
 }
 
 .menu-button:first-child {
-  grid-column: 1 / -1;
-  min-height: 112px;
+  min-height: 58px;
 }
 
 .menu-button span {
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 950;
 }
 
@@ -466,17 +502,22 @@ li {
 }
 
 .menu-button b {
-  font-size: 17px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
 }
 
 .menu-button small {
   color: rgba(255, 255, 255, 0.72);
-  margin-top: 4px;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.1;
 }
 
 .menu-button i {
   color: var(--white);
-  font-size: 30px;
+  font-size: 20px;
   text-align: right;
 }
 
@@ -489,7 +530,7 @@ li {
 }
 
 .home-metrics {
-  display: none;
+  display: none !important;
 }
 
 .page-title {

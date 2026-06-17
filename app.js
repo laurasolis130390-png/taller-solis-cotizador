@@ -5,6 +5,7 @@ import { LOCAL_DEMO_PASSWORD, LOCAL_DEMO_USER, SUPABASE_ANON_KEY, SUPABASE_URL }
 const STORAGE_KEY = "taller-solis-web";
 const BIOMETRIC_KEY = "taller-solis-biometric";
 const SOUND_KEY = "taller-solis-sound";
+const APP_VERSION_KEY = "taller-solis-app-version";
 const TAX = 0.16;
 const AI_USAGE_START = 2;
 const QUOTE_STATUSES = ["Pendiente", "Enviada", "Aprobada", "En reparación", "Lista", "Facturada", "Cancelada"];
@@ -76,6 +77,50 @@ function trackAiUsage(kind) {
   if (kind === "quote") state.aiUsage.quoteReads += 1;
   saveState();
   if (currentUser) syncCloudState();
+}
+
+async function refreshAppNow() {
+  try {
+    const registrations = await navigator.serviceWorker?.getRegistrations?.();
+    await Promise.all((registrations || []).map((registration) => registration.update().catch(() => undefined)));
+  } catch {
+    // Continue with cache cleanup.
+  }
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+  } catch {
+    // Some browsers may block cache access; reload still helps.
+  }
+  window.location.href = `./?v=${Date.now()}`;
+}
+
+async function checkForAppUpdate() {
+  const banner = document.getElementById("update-banner");
+  const button = document.getElementById("update-button");
+  if (!banner || !button) return;
+  button.addEventListener("click", refreshAppNow);
+  try {
+    const response = await fetch(`./version.json?ts=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const latest = String(data.version || "");
+    if (!latest) return;
+    const current = localStorage.getItem(APP_VERSION_KEY);
+    if (!current) {
+      localStorage.setItem(APP_VERSION_KEY, latest);
+      return;
+    }
+    if (current !== latest) {
+      banner.classList.add("ready");
+      button.onclick = async () => {
+        localStorage.setItem(APP_VERSION_KEY, latest);
+        await refreshAppNow();
+      };
+    }
+  } catch {
+    // Offline or GitHub still publishing; ignore silently.
+  }
 }
 
 function createSmartDraft() {
@@ -1806,7 +1851,10 @@ function setup() {
     document.getElementById("new-vehicle").value = "";
     renderClients();
   });
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js").catch(() => undefined);
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").then((registration) => registration.update()).catch(() => undefined);
+  }
+  checkForAppUpdate();
   render();
 }
 

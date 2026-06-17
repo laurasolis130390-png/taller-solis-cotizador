@@ -1,9 +1,10 @@
-const CACHE_NAME = "taller-solis-cotizador-v39";
+const CACHE_NAME = "taller-solis-cotizador-v40";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./version.json",
   "./supabase-config.js",
   "./manifest.json",
   "./icon.svg",
