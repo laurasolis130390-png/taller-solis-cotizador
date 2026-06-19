@@ -1159,7 +1159,17 @@ function renderClients() {
   document.getElementById("client-list").innerHTML = state.clients
     .map((client) => {
       const count = state.quotes.filter((quote) => quote.clientName.toLowerCase() === client.name.toLowerCase() && !quote.deletedAt).length;
-      return `<article class="panel"><h2>${escapeHtml(client.name)}</h2><p>${escapeHtml(client.phone || "Sin telefono")}</p><p>Vehiculos: ${escapeHtml(client.vehicles.join(", ") || "Sin vehiculos")}</p><b>Cotizaciones: ${count}</b></article>`;
+      return `<article class="panel client-card" data-client-card="${client.id}">
+        <h2>${escapeHtml(client.name || "Cliente sin nombre")}</h2>
+        <label>Nombre<input data-client-field="name" data-client-id="${client.id}" value="${escapeHtml(client.name || "")}" /></label>
+        <label>Telefono<input data-client-field="phone" data-client-id="${client.id}" value="${escapeHtml(client.phone || "")}" /></label>
+        <label>Vehiculos<input data-client-field="vehicles" data-client-id="${client.id}" value="${escapeHtml((client.vehicles || []).join(", "))}" /></label>
+        <p>Cotizaciones: ${count}</p>
+        <div class="actions">
+          <button class="primary" data-save-client="${client.id}">Guardar cambios</button>
+          <button class="danger" data-delete-client="${client.id}">Borrar cliente</button>
+        </div>
+      </article>`;
     })
     .join("");
 }
@@ -1901,6 +1911,37 @@ function setup() {
     document.getElementById("new-phone").value = "";
     document.getElementById("new-vehicle").value = "";
     renderClients();
+  });
+  document.getElementById("client-list").addEventListener("click", (event) => {
+    const saveId = event.target.dataset.saveClient;
+    const deleteId = event.target.dataset.deleteClient;
+    if (saveId) {
+      const client = state.clients.find((item) => item.id === saveId);
+      if (!client) return;
+      const oldName = client.name;
+      const card = document.querySelector(`[data-client-card="${saveId}"]`);
+      const name = card.querySelector('[data-client-field="name"]').value.trim();
+      if (!name) return alert("El cliente necesita nombre.");
+      client.name = name;
+      client.phone = card.querySelector('[data-client-field="phone"]').value.trim();
+      client.vehicles = card
+        .querySelector('[data-client-field="vehicles"]')
+        .value.split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      state.quotes = state.quotes.map((quote) => (quote.clientName === oldName ? { ...quote, clientName: name } : quote));
+      syncCloudState();
+      render();
+      alert("Cliente actualizado.");
+    }
+    if (deleteId) {
+      const client = state.clients.find((item) => item.id === deleteId);
+      if (client && confirm(`Borrar cliente ${client.name}? Sus cotizaciones se quedan guardadas.`)) {
+        state.clients = state.clients.filter((item) => item.id !== deleteId);
+        syncCloudState();
+        renderClients();
+      }
+    }
   });
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js").then((registration) => registration.update()).catch(() => undefined);
